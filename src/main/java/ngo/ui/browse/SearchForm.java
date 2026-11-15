@@ -124,24 +124,28 @@ public class SearchForm extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSearchActionPerformed
-        final String keyword = txtKeyword.getText().trim();
+                final String keyword = txtKeyword.getText().trim();
         final String status = String.valueOf(cboStatus.getSelectedItem());
         final String priority = String.valueOf(cboPriority.getSelectedItem());
         btnSearch.setEnabled(false);
-        new javax.swing.SwingWorker<java.util.List<ngo.model.Task>, Void>() {
+        new javax.swing.SwingWorker<java.util.List<Object[]>, Void>() {
             @Override
-            protected java.util.List<ngo.model.Task> doInBackground() throws Exception {
-                return new ngo.dao.TaskDAO().search(null, keyword, status, priority);
+            protected java.util.List<Object[]> doInBackground() throws Exception {
+                return new ngo.dao.TaskDAO().searchRows(null, keyword, status, priority);
             }
 
             @Override
             protected void done() {
                 try {
-                    javax.swing.table.DefaultTableModel model = new javax.swing.table.DefaultTableModel(
-                            new String[]{"ID", "Tiêu đề", "Ưu tiên", "Trạng thái", "Hạn"}, 0);
-                    for (ngo.model.Task t : get()) {
-                        model.addRow(new Object[]{t.getTaskId(), t.getTitle(),
-                            t.getPriority(), t.getStatus(), t.getDueDate()});
+                    javax.swing.table.DefaultTableModel model =
+                            new javax.swing.table.DefaultTableModel(ngo.dao.TaskDAO.BROWSE_COLUMNS, 0) {
+                        @Override
+                        public boolean isCellEditable(int r, int c) {
+                            return false;
+                        }
+                    };
+                    for (Object[] row : get()) {
+                        model.addRow(row);
                     }
                     tblResults.setModel(model);
                 } catch (Exception ex) {
@@ -152,7 +156,7 @@ public class SearchForm extends javax.swing.JFrame {
                     btnSearch.setEnabled(true);
                 }
             }
-        }.execute();        // TODO add your handling code here:
+        }.execute();      // TODO add your handling code here:
     }//GEN-LAST:event_btnSearchActionPerformed
 
     /**
