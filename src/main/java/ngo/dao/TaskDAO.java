@@ -136,7 +136,65 @@ public class TaskDAO {
             throw DataAccessException.from(e);
         }
     }
+    
+    /**
+     * Search form: giống search() nhưng trả về dòng cho JTable, cùng 7 cột với browseRows()
+     * (dùng chung BROWSE_COLUMNS). Tham số nào null hoặc rỗng thì bỏ qua điều kiện đó.
+     */
+    public List<Object[]> searchRows(Integer projectId, String keyword, String status, String priority) {
+        StringBuilder sql = new StringBuilder(
+                "SELECT t.task_id, t.title, tm.team_name, t.priority, t.status, t.due_date, "
+                + "GROUP_CONCAT(v.full_name ORDER BY v.full_name SEPARATOR ', ') AS assignees "
+                + "FROM TASK t "
+                + "JOIN TEAM tm ON tm.team_id = t.team_id "
+                + "LEFT JOIN TASK_ASSIGNMENT a ON a.task_id = t.task_id "
+                + "LEFT JOIN VOLUNTEER v ON v.volunteer_id = a.volunteer_id "
+                + "WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+        if (projectId != null) {
+            sql.append(" AND t.project_id = ?");
+            params.add(projectId);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (t.title LIKE ? OR t.description LIKE ?)");
+            String k = "%" + keyword.trim() + "%";
+            params.add(k);
+            params.add(k);
+        }
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND t.status = ?");
+            params.add(status);
+        }
+        if (priority != null && !priority.isBlank()) {
+            sql.append(" AND t.priority = ?");
+            params.add(priority);
+        }
+        sql.append(" GROUP BY t.task_id, t.title, tm.team_name, t.priority, t.status, t.due_date")
+           .append(" ORDER BY t.task_id");
 
+        try (Connection c = DBConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Object[]> rows = new ArrayList<>();
+                while (rs.next()) {
+                    Date due = rs.getDate("due_date");
+                    String assignees = rs.getString("assignees");
+                    rows.add(new Object[]{
+                            rs.getInt("task_id"), rs.getString("title"), rs.getString("team_name"),
+                            rs.getString("priority"), rs.getString("status"),
+                            due == null ? "" : due.toLocalDate().toString(),
+                            assignees == null ? "" : assignees});
+                }
+                return rows;
+            }
+        } catch (SQLException e) {
+            throw DataAccessException.from(e);
+        }
+    }
+    
     // ---------------- UPDATE ----------------
     public int update(Connection c, Task t) throws SQLException {
         String sql = "UPDATE TASK SET project_id=?, team_id=?, title=?, description=?, priority=?, "
