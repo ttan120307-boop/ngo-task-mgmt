@@ -32,6 +32,19 @@ public class DataAccessException extends RuntimeException {
         TRIGGER_MSG.put("Dependent and prerequisite task must belong to the same project",
                 "Hai task phụ thuộc nhau phải thuộc cùng một project.");
 
+        TRIGGER_MSG.put("A task that has already started cannot get an unfinished prerequisite",
+                "Task đã bắt đầu nên không thể thêm task tiên quyết chưa hoàn thành.");
+        TRIGGER_MSG.put("A dependency cannot be updated; delete it and insert a new one",
+                "Không thể sửa phụ thuộc; hãy xóa rồi thêm lại.");
+        TRIGGER_MSG.put("Joined date is before the volunteer registered date",
+                "Ngày tham gia không được trước ngày đăng ký của tình nguyện viên.");
+        TRIGGER_MSG.put("Joined date is before the team was created",
+                "Ngày tham gia không được trước ngày thành lập team.");
+        TRIGGER_MSG.put("This team already has a current Leader",
+                "Team này đã có Leader hiện tại.");
+
+        CHECK_MSG.put("ck_membership_dates", "Ngày rời team phải sau hoặc bằng ngày tham gia.");
+        CHECK_MSG.put("ck_project_name", "Tên project không được để trống.");
         CHECK_MSG.put("ck_task_priority", "Priority phải là LOW, MEDIUM, HIGH hoặc URGENT.");
         CHECK_MSG.put("ck_task_status", "Status phải là TODO, IN_PROGRESS, DONE hoặc CANCELLED.");
         CHECK_MSG.put("ck_task_title", "Tiêu đề task không được để trống.");
@@ -60,7 +73,11 @@ public class DataAccessException extends RuntimeException {
                     if (raw.contains(en.getKey())) { msg = en.getValue(); break; }
                 }
                 break;
-            case 1062: msg = "Dữ liệu bị trùng với bản ghi đã tồn tại."; break;
+            case 1062:
+                if (raw.contains("uq_membership_one_current")) msg = "Tình nguyện viên này đang là thành viên của team rồi.";
+                else if (raw.contains("uq_membership_same_day")) msg = "Đã có bản ghi tham gia team này trong cùng ngày.";
+                else msg = "Dữ liệu bị trùng với bản ghi đã tồn tại.";
+                break;
             case 1451: msg = "Không thể xóa/sửa vì dữ liệu đang được bản ghi khác sử dụng."; break;
             case 1452: msg = "Dữ liệu tham chiếu không tồn tại (Project/Team/Volunteer/Task không hợp lệ)."; break;
             case 1048: msg = "Thiếu thông tin bắt buộc (có trường không được để trống)."; break;
