@@ -51,7 +51,7 @@ public class MainFrame extends JFrame {
         addButton(view, "Tìm kiếm Task (Search)", "search", () -> new SearchForm());
 
         JPanel edit = group("Chỉnh sửa");
-        addButton(edit, "Thêm, sửa, xóa Task, bình luận, chuyển giao việc", "editing", () -> {
+        addButton(edit, "Editing: Task, Project, Membership, Label, Dependency, Comment, Assignment", "editing", () -> {
             JFrame f = new JFrame("Editing & Validation");
             f.setContentPane(new EditingValidationPanel());
             f.setSize(1180, 820);
