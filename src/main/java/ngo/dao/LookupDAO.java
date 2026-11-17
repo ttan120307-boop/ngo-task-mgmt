@@ -47,6 +47,11 @@ public class LookupDAO {
         return query("SELECT team_id, team_name FROM TEAM ORDER BY team_name", null);
     }
 
+    /** Vai trò trong team (Leader, Member...), cho combobox khi tham gia team. */
+    public List<ComboItem> teamRoles() {
+        return query("SELECT team_role_id, role_name FROM TEAM_ROLE ORDER BY role_name", null);
+    }
+
     /** Tất cả volunteer, sắp theo tên. */
     public List<ComboItem> volunteers() {
         return query("SELECT volunteer_id, full_name FROM VOLUNTEER ORDER BY full_name", null);
