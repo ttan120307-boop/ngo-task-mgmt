@@ -49,7 +49,7 @@ mvn compile org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass=ngo.
 
 Thanh dưới cùng của cửa sổ chính cho biết đã kết nối được MySQL hay chưa. Nếu hiện lỗi, xem mục "Lỗi thường gặp".
 
-Các form cũng chạy riêng được: `ngo.ui.grid.BrowseForm`, `ngo.ui.browse.MasterDetailForm`, `ngo.ui.browse.SearchForm`, `ngo.ui.edit.EditingValidationDemo`. Lớp `ngo.Demo` chạy thử backend (thêm, sửa, tìm kiếm, xóa task, transaction COMMIT và ROLLBACK, các lỗi mẫu) và in kết quả ra Terminal.
+Các form cũng chạy riêng được: `ngo.ui.grid.BrowseForm`, `ngo.ui.browse.MasterDetailForm`, `ngo.ui.browse.SearchForm`, `ngo.ui.edit.EditingValidationDemo`. Trong Editing & Validation có các tab Task CRUD + Labels + Dependencies, Project CRUD, Team Membership, Transfer Assignment, Comment & Attachment và Task Report. Lớp `ngo.Demo` chạy thử backend (thêm, sửa, tìm kiếm, xóa task, transaction COMMIT và ROLLBACK, các lỗi mẫu) và in kết quả ra Terminal.
 
 ## Cấu trúc project
 
@@ -100,10 +100,10 @@ Hạn chế đã biết: quy tắc thành viên team chỉ được kiểm tra l
 | Giao việc cho nhiều người, chuyển giao việc | Có | Có |
 | Bình luận và tệp đính kèm | Có | Có |
 | Báo cáo Task | Có | Có |
-| Thêm, sửa, xóa Project | Có | Chưa có |
-| Tham gia, rời team (Membership) | Có | Chưa có |
-| Thêm, gỡ phụ thuộc giữa các task | Có | Chưa có |
-| Gắn, gỡ nhãn cho task | Có | Chưa có |
+| Thêm, sửa, xóa Project | Có | Có |
+| Tham gia, rời team (Membership) | Có | Có |
+| Thêm, gỡ phụ thuộc giữa các task | Có | Có |
+| Gắn, gỡ nhãn cho task | Có | Có |
 
 ## Lỗi thường gặp
 

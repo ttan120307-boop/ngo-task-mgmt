@@ -9,7 +9,9 @@ public class EditingValidationPanel extends JPanel {
     public EditingValidationPanel() {
         super(new BorderLayout());
         JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Task CRUD", new TaskEditingPanel());
+        tabs.addTab("Task CRUD + Labels + Dependencies", new TaskEditingPanel());
+        tabs.addTab("Project CRUD", new ProjectEditingPanel());
+        tabs.addTab("Team Membership", new MembershipEditingPanel());
         tabs.addTab("Transfer Assignment", new AssignmentTransferPanel());
         tabs.addTab("Comment & Attachment", new CommentAttachmentPanel());
         tabs.addTab("Task Report", new TaskReportPanel());

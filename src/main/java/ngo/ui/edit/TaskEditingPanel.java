@@ -25,6 +25,7 @@ public class TaskEditingPanel extends JPanel {
     private final TaskDAO taskDAO = new TaskDAO();
     private final TaskService taskService = new TaskService();
     private final LookupDAO lookupDAO = new LookupDAO();
+    private final TaskRelationsPanel relationsPanel = new TaskRelationsPanel();
 
     private final JComboBox<LookupDAO.ComboItem> projectCombo = new JComboBox<>();
     private final JComboBox<LookupDAO.ComboItem> teamCombo = new JComboBox<>();
@@ -100,9 +101,14 @@ public class TaskEditingPanel extends JPanel {
         actions.add(refreshButton);
         actions.add(modeLabel);
 
-        JPanel top = new JPanel(new BorderLayout(6, 6));
-        top.add(form, BorderLayout.CENTER);
-        top.add(actions, BorderLayout.SOUTH);
+        JPanel taskInfo = new JPanel(new BorderLayout(6, 6));
+        taskInfo.add(form, BorderLayout.CENTER);
+        taskInfo.add(actions, BorderLayout.SOUTH);
+        JTabbedPane taskTabs = new JTabbedPane();
+        taskTabs.addTab("Task information / CRUD", taskInfo);
+        taskTabs.addTab("Labels & Dependencies", relationsPanel);
+        JPanel top = new JPanel(new BorderLayout());
+        top.add(taskTabs, BorderLayout.CENTER);
 
         taskTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         taskTable.setAutoCreateRowSorter(true);
@@ -197,6 +203,7 @@ public class TaskEditingPanel extends JPanel {
                 return;
             }
             fillForm(task);
+            relationsPanel.setSelectedTask(task.getTaskId(), task.getTitle());
             setEditMode(true);
         }, () -> setBusy(false));
     }
@@ -335,6 +342,7 @@ public class TaskEditingPanel extends JPanel {
     }
 
     private void clearForm() {
+        relationsPanel.setSelectedTask(-1, null);
         taskTable.clearSelection();
         projectCombo.setSelectedIndex(projectCombo.getItemCount() > 0 ? 0 : -1);
         teamCombo.setSelectedIndex(teamCombo.getItemCount() > 0 ? 0 : -1);
