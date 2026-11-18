@@ -11,13 +11,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Dữ liệu cho các ComboBox: danh sách Project, Team, Volunteer.
- * Mỗi phần tử là ComboItem (id + nhãn). Cho thẳng vào JComboBox, ô sẽ hiện nhãn,
- * còn id lấy bằng ((LookupDAO.ComboItem) combo.getSelectedItem()).getId().
+ * Data for ComboBoxes: lists of Projects, Teams, and Volunteers.
+ * Each element is a ComboItem (id + label). Add directly to a JComboBox, and the box will display the label,
+ * while the ID can be retrieved via ((LookupDAO.ComboItem) combo.getSelectedItem()).getId().
  */
 public class LookupDAO {
 
-    /** Giá trị cố định (khớp CHECK của bảng TASK). Dùng cho combobox Priority / Status. */
+    /** Fixed values (matching the CHECK constraint of the TASK table). Used for Priority / Status ComboBoxes. */
     public static final String[] PRIORITIES = {"LOW", "MEDIUM", "HIGH", "URGENT"};
     public static final String[] STATUSES = {"TODO", "IN_PROGRESS", "DONE", "CANCELLED"};
 
@@ -37,29 +37,29 @@ public class LookupDAO {
         public String toString() { return label; }   // JComboBox hiển thị nhãn này
     }
 
-    /** Tất cả project, sắp theo tên. */
+    /** All projects, sorted by name. */
     public List<ComboItem> projects() {
         return query("SELECT project_id, project_name FROM PROJECT ORDER BY project_name", null);
     }
 
-    /** Tất cả team, sắp theo tên. */
+    /** All projects, sorted by name. */
     public List<ComboItem> teams() {
         return query("SELECT team_id, team_name FROM TEAM ORDER BY team_name", null);
     }
 
-    /** Vai trò trong team (Leader, Member...), cho combobox khi tham gia team. */
+    /** Team roles (Leader, Member...), for the ComboBox when joining a team. */
     public List<ComboItem> teamRoles() {
         return query("SELECT team_role_id, role_name FROM TEAM_ROLE ORDER BY role_name", null);
     }
 
-    /** Tất cả volunteer, sắp theo tên. */
+    /** All volunteers, sorted by name. */
     public List<ComboItem> volunteers() {
         return query("SELECT volunteer_id, full_name FROM VOLUNTEER ORDER BY full_name", null);
     }
 
     /**
-     * Chỉ những người ĐANG là thành viên của team (left_date IS NULL).
-     * Dùng cho combobox "Người thực hiện": đúng quy tắc BR8, tránh chọn nhầm người ngoài team.
+     * Only current members of the team (left_date IS NULL).
+     * Used for the "Assignee" ComboBox: enforces rule BR8, preventing accidental selection of people outside the team.
      */
     public List<ComboItem> currentMembersOfTeam(int teamId) {
         return query("SELECT DISTINCT v.volunteer_id, v.full_name "
