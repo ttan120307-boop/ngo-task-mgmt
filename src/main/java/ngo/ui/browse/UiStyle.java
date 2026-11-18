@@ -226,6 +226,11 @@ private static JPanel sidebar(String active, final JFrame current) {
                 new SearchForm().setVisible(true);
                 current.dispose();
             }
+                    } else if (name.equals("Browse")) {
+            if (!(current instanceof ngo.ui.grid.BrowseForm)) {
+                new ngo.ui.grid.BrowseForm().setVisible(true);
+                current.dispose();
+            }
         } else if (name.equals("Projects")) {
             if (!(current instanceof MasterDetailForm)) {
                 new MasterDetailForm().setVisible(true);
