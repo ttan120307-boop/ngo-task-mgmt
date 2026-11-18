@@ -1,101 +1,123 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+package ngo.ui.grid;
 
-<Form version="1.3" maxVersion="1.9" type="org.netbeans.modules.form.forminfo.JFrameFormInfo">
-  <Properties>
-    <Property name="defaultCloseOperation" type="int" value="3"/>
-  </Properties>
-  <SyntheticProperties>
-    <SyntheticProperty name="formSizePolicy" type="int" value="1"/>
-    <SyntheticProperty name="generateCenter" type="boolean" value="false"/>
-  </SyntheticProperties>
-  <AuxValues>
-    <AuxValue name="FormSettings_autoResourcing" type="java.lang.Integer" value="0"/>
-    <AuxValue name="FormSettings_autoSetComponentName" type="java.lang.Boolean" value="false"/>
-    <AuxValue name="FormSettings_generateFQN" type="java.lang.Boolean" value="true"/>
-    <AuxValue name="FormSettings_generateMnemonicsCode" type="java.lang.Boolean" value="false"/>
-    <AuxValue name="FormSettings_i18nAutoMode" type="java.lang.Boolean" value="false"/>
-    <AuxValue name="FormSettings_layoutCodeTarget" type="java.lang.Integer" value="1"/>
-    <AuxValue name="FormSettings_listenerGenerationStyle" type="java.lang.Integer" value="3"/>
-    <AuxValue name="FormSettings_variablesLocal" type="java.lang.Boolean" value="false"/>
-    <AuxValue name="FormSettings_variablesModifier" type="java.lang.Integer" value="2"/>
-  </AuxValues>
+import ngo.dao.LookupDAO;
+import ngo.dao.LookupDAO.ComboItem;
+import ngo.dao.TaskDAO;
+import ngo.db.DataAccessException;
 
-  <Layout>
-    <DimensionLayout dim="0">
-      <Group type="103" groupAlignment="0" attributes="0">
-          <Component id="jScrollPane1" alignment="1" pref="400" max="32767" attributes="0"/>
-          <Component id="jScrollPane2" alignment="1" pref="0" max="32767" attributes="0"/>
-          <Group type="102" attributes="0">
-              <EmptySpace max="-2" attributes="0"/>
-              <Group type="103" groupAlignment="0" attributes="0">
-                  <Component id="jLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
-                  <Component id="jLabel2" alignment="0" min="-2" max="-2" attributes="0"/>
-              </Group>
-              <EmptySpace max="32767" attributes="0"/>
-          </Group>
-      </Group>
-    </DimensionLayout>
-    <DimensionLayout dim="1">
-      <Group type="103" groupAlignment="0" attributes="0">
-          <Group type="102" alignment="0" attributes="0">
-              <EmptySpace min="-2" pref="13" max="-2" attributes="0"/>
-              <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
-              <EmptySpace type="unrelated" max="-2" attributes="0"/>
-              <Component id="jScrollPane1" min="-2" pref="105" max="-2" attributes="0"/>
-              <EmptySpace pref="21" max="32767" attributes="0"/>
-              <Component id="jLabel2" min="-2" max="-2" attributes="0"/>
-              <EmptySpace type="unrelated" max="-2" attributes="0"/>
-              <Component id="jScrollPane2" min="-2" pref="105" max="-2" attributes="0"/>
-          </Group>
-      </Group>
-    </DimensionLayout>
-  </Layout>
-  <SubComponents>
-    <Container class="javax.swing.JScrollPane" name="jScrollPane1">
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
+import javax.swing.table.DefaultTableModel;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 
-      <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
-      <SubComponents>
-        <Component class="javax.swing.JTable" name="tblProjects">
-          <Properties>
-            <Property name="model" type="javax.swing.table.TableModel" editor="org.netbeans.modules.form.editors2.TableModelEditor">
-              <Table columnCount="4" rowCount="4">
-                <Column editable="true" title="Title 1" type="java.lang.Object"/>
-                <Column editable="true" title="Title 2" type="java.lang.Object"/>
-                <Column editable="true" title="Title 3" type="java.lang.Object"/>
-                <Column editable="true" title="Title 4" type="java.lang.Object"/>
-              </Table>
-            </Property>
-          </Properties>
-        </Component>
-      </SubComponents>
-    </Container>
-    <Container class="javax.swing.JScrollPane" name="jScrollPane2">
+/**
+ * Browse form: displays the list of Tasks in a grid (JTable), filtered by Project.
+ * Data is fetched from TaskDAO.browseRows / searchRows and loaded on a background thread to keep the UI responsive.
+ */
+public class BrowseForm extends JFrame {
+    private static final ComboItem ALL = new ComboItem(-1, "All Projects");
 
-      <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
-      <SubComponents>
-        <Component class="javax.swing.JTable" name="tblTasks">
-          <Properties>
-            <Property name="model" type="javax.swing.table.TableModel" editor="org.netbeans.modules.form.editors2.TableModelEditor">
-              <Table columnCount="4" rowCount="4">
-                <Column editable="true" title="Title 1" type="java.lang.Object"/>
-                <Column editable="true" title="Title 2" type="java.lang.Object"/>
-                <Column editable="true" title="Title 3" type="java.lang.Object"/>
-                <Column editable="true" title="Title 4" type="java.lang.Object"/>
-              </Table>
-            </Property>
-          </Properties>
-        </Component>
-      </SubComponents>
-    </Container>
-    <Component class="javax.swing.JLabel" name="jLabel1">
-      <Properties>
-        <Property name="text" type="java.lang.String" value="Projects"/>
-      </Properties>
-    </Component>
-    <Component class="javax.swing.JLabel" name="jLabel2">
-      <Properties>
-        <Property name="text" type="java.lang.String" value="Tasks of selected project"/>
-      </Properties>
-    </Component>
-  </SubComponents>
-</Form>
+    private final TaskDAO taskDAO = new TaskDAO();
+    private final LookupDAO lookupDAO = new LookupDAO();
+
+    private final JComboBox<ComboItem> cboProject = new JComboBox<>();
+    private final JLabel lblCount = new JLabel(" ");
+    private final DefaultTableModel model = new DefaultTableModel(TaskDAO.BROWSE_COLUMNS, 0) {
+        @Override public boolean isCellEditable(int row, int col) { return false; }   // read-only grid
+    };
+    private final JTable table = new JTable(model);
+    private boolean adjusting = false;   // true while populating combobox to avoid redundant grid reloads
+
+    public BrowseForm() {
+        super("Browse Tasks");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(1000, 520);
+        setLocationRelativeTo(null);
+
+        JButton btnRefresh = new JButton("Refresh");
+        btnRefresh.addActionListener(e -> loadTasks());
+        cboProject.addActionListener(e -> {
+            if (!adjusting) loadTasks();
+        });
+
+        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        top.add(new JLabel("Project:"));
+        top.add(cboProject);
+        top.add(btnRefresh);
+
+        table.setAutoCreateRowSorter(true);          // click column headers to sort
+        table.setFillsViewportHeight(true);
+
+        add(top, BorderLayout.NORTH);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+        add(lblCount, BorderLayout.SOUTH);
+
+        loadProjects();
+    }
+
+    private void loadProjects() {
+        runAsync(lookupDAO::projects, (List<ComboItem> projects) -> {
+            adjusting = true;
+            cboProject.removeAllItems();
+            cboProject.addItem(ALL);
+            for (ComboItem p : projects) cboProject.addItem(p);
+            cboProject.setSelectedIndex(0);
+            adjusting = false;
+            loadTasks();
+        });
+    }
+
+    private void loadTasks() {
+        ComboItem sel = (ComboItem) cboProject.getSelectedItem();
+        if (sel == null) return;
+        runAsync(() -> sel.getId() == ALL.getId()
+                        ? taskDAO.searchRows(null, null, null, null)   // all projects
+                        : taskDAO.browseRows(sel.getId()),
+                (List<Object[]> rows) -> {
+                    model.setRowCount(0);
+                    for (Object[] r : rows) model.addRow(r);
+                    lblCount.setText("  " + rows.size() + " task(s)");
+                });
+    }
+
+    /** Runs heavy work (DB calls) on a background thread, then updates the UI on the EDT. */
+    private <T> void runAsync(Callable<T> work, Consumer<T> onDone) {
+        new SwingWorker<T, Void>() {
+            @Override protected T doInBackground() throws Exception { return work.call(); }
+
+            @Override protected void done() {
+                try {
+                    onDone.accept(get());
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                } catch (ExecutionException ee) {
+                    showError(ee.getCause());
+                }
+            }
+        }.execute();
+    }
+
+    private void showError(Throwable cause) {
+        String msg = (cause instanceof DataAccessException || cause instanceof IllegalArgumentException)
+                ? cause.getMessage()
+                : "An unexpected error occurred. Please try again.";
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new BrowseForm().setVisible(true));
+    }
+}
