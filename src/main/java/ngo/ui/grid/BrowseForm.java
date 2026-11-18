@@ -37,8 +37,8 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.RenderingHints;
 /**
- * Browse form: hiển thị danh sách Task lên lưới (JTable), lọc theo Project.
- * Dữ liệu lấy từ TaskDAO.browseRows / searchRows, tải trong luồng nền để giao diện không bị treo.
+ * Browse form: displays the list of Tasks in a grid (JTable), filtered by Project.
+ * Data is fetched from TaskDAO.browseRows / searchRows and loaded on a background thread to keep the UI responsive.
  */
 public class BrowseForm extends JFrame {
    private static final ComboItem ALL = new ComboItem(-1, "All projects");
@@ -57,8 +57,7 @@ public class BrowseForm extends JFrame {
     private RoundButton refreshBtn;
     private final JLabel lblCount = new JLabel(" ");
     private final DefaultTableModel model = new DefaultTableModel(TaskDAO.BROWSE_COLUMNS, 0) {
-        @Override
-        public boolean isCellEditable(int row, int col) { return false; }   // lưới chỉ để xem
+        @Override public boolean isCellEditable(int row, int col) { return false; }   // read-only grid
     };
     private final JTable table = new JTable(model);
     private int totalTasks = -1;   // tổng số task (biết sau lần tải "All projects")   // true khi đang nạp combobox, tránh tải lưới nhiều lần
@@ -184,14 +183,12 @@ public class BrowseForm extends JFrame {
                 });
     }
 
-    /** Chạy việc nặng (gọi DB) ở luồng nền, rồi cập nhật giao diện ở luồng giao diện. */
+    /** Runs heavy work (DB calls) on a background thread, then updates the UI on the EDT. */
     private <T> void runAsync(Callable<T> work, Consumer<T> onDone) {
         new SwingWorker<T, Void>() {
-            @Override
-            protected T doInBackground() throws Exception { return work.call(); }
+            @Override protected T doInBackground() throws Exception { return work.call(); }
 
-            @Override
-            protected void done() {
+            @Override protected void done() {
                 try {
                     onDone.accept(get());
                 } catch (InterruptedException ie) {

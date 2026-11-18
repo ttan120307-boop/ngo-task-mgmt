@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Set;
 
-/** Ánh xạ bảng TASK. */
+/** Maps to the TASK table. */
 public class Task {
     private static final Set<String> PRIORITIES = Set.of("LOW", "MEDIUM", "HIGH", "URGENT");
     private static final Set<String> STATUSES = Set.of("TODO", "IN_PROGRESS", "DONE", "CANCELLED");
@@ -13,11 +13,11 @@ public class Task {
     private int projectId;
     private int teamId;
     private String title;
-    private String description;          // có thể null
+    private String description;          // nullable
     private String priority = "MEDIUM";
     private String status = "TODO";
-    private BigDecimal estimatedHours;   // có thể null
-    private LocalDate dueDate;           // có thể null
+    private BigDecimal estimatedHours;   // nullable
+    private LocalDate dueDate;           // nullable
 
     public int getTaskId() { return taskId; }
     public void setTaskId(int taskId) { this.taskId = taskId; }
@@ -38,15 +38,15 @@ public class Task {
     public LocalDate getDueDate() { return dueDate; }
     public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
 
-    /** Validate phía Java (bắt lỗi sớm, trước khi chạm DB). Trả về null nếu hợp lệ. */
+    /** Java-side validation (catches errors early before touching the DB). Returns null if valid. */
     public String validate() {
-        if (title == null || title.isBlank()) return "Tiêu đề task không được để trống.";
-        if (title.length() > 150) return "Tiêu đề tối đa 150 ký tự.";
-        if (projectId <= 0) return "Phải chọn Project.";
-        if (teamId <= 0) return "Phải chọn Team phụ trách.";
-        if (!PRIORITIES.contains(priority)) return "Priority phải là LOW, MEDIUM, HIGH hoặc URGENT.";
-        if (!STATUSES.contains(status)) return "Status phải là TODO, IN_PROGRESS, DONE hoặc CANCELLED.";
-        if (estimatedHours != null && estimatedHours.signum() <= 0) return "Số giờ ước tính phải lớn hơn 0.";
+        if (title == null || title.isBlank()) return "Task title cannot be empty.";
+        if (title.length() > 150) return "Task title must be at most 150 characters.";
+        if (projectId <= 0) return "Please select a Project.";
+        if (teamId <= 0) return "Please select an assigned Team.";
+        if (!PRIORITIES.contains(priority)) return "Priority must be LOW, MEDIUM, HIGH, or URGENT.";
+        if (!STATUSES.contains(status)) return "Status must be TODO, IN_PROGRESS, DONE, or CANCELLED.";
+        if (estimatedHours != null && estimatedHours.signum() <= 0) return "Estimated hours must be greater than 0.";
         return null;
     }
 

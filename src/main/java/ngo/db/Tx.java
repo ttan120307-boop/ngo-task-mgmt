@@ -4,8 +4,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 /**
- * Chạy một nhóm lệnh SQL trong MỘT transaction:
- * setAutoCommit(false) -> chạy work -> COMMIT; có lỗi -> ROLLBACK.
+ * Executes a group of SQL statements within a SINGLE transaction:
+ * setAutoCommit(false) -> execute work -> COMMIT; on error -> ROLLBACK.
  */
 public final class Tx {
     @FunctionalInterface
@@ -25,11 +25,11 @@ public final class Tx {
             } catch (SQLException e) {
                 rollbackQuietly(c);
                 throw DataAccessException.from(e);
-            } catch (RuntimeException e) {   // lỗi nghiệp vụ/validate trong work cũng phải ROLLBACK
+            } catch (RuntimeException e) {   // business/validation errors inside work must also ROLLBACK
                 rollbackQuietly(c);
                 throw e;
             }
-        } catch (SQLException e) {           // lỗi mở/đóng kết nối
+        } catch (SQLException e) {           // error opening/closing connection
             throw DataAccessException.from(e);
         }
     }

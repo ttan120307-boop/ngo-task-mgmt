@@ -7,39 +7,52 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Ngoại lệ "thân thiện": getMessage() là câu tiếng Việt dễ hiểu để UI hiển thị
- * (JOptionPane...). Chi tiết SQL gốc chỉ ghi vào log, không đưa lên giao diện.
+ * User-friendly exception: getMessage() returns a clear English message for UI display
+ * (JOptionPane...). Raw SQL details are logged only and never exposed to the UI.
  */
 public class DataAccessException extends RuntimeException {
     private static final Logger LOG = Logger.getLogger(DataAccessException.class.getName());
 
-    // Thông báo từ trigger (SIGNAL SQLSTATE '45000' -> MySQL error 1644)
+    // Messages from triggers (SIGNAL SQLSTATE '45000' -> MySQL error 1644)
     private static final Map<String, String> TRIGGER_MSG = new LinkedHashMap<>();
-    // Tên CHECK constraint -> thông báo
+    // CHECK constraint name -> user-friendly message
     private static final Map<String, String> CHECK_MSG = new LinkedHashMap<>();
+
     static {
         TRIGGER_MSG.put("Assigned volunteer must be a current member of the task team",
-                "Tình nguyện viên phải là thành viên hiện tại của team phụ trách task.");
+                "The assigned volunteer must be a current member of the task's team.");
         TRIGGER_MSG.put("A task cannot start until all its prerequisite tasks are completed",
-                "Task chưa thể chuyển sang IN_PROGRESS/DONE vì còn task tiên quyết chưa hoàn thành.");
+                "Cannot change status to IN_PROGRESS/DONE while prerequisite tasks are still unfinished.");
         TRIGGER_MSG.put("A task cannot be re-opened while a dependent task has already started",
-                "Không thể mở lại task vì có task phụ thuộc đã bắt đầu.");
+                "Cannot reopen this task because a dependent task has already started.");
         TRIGGER_MSG.put("A task that has dependencies cannot move to another project",
-                "Task đang có phụ thuộc nên không thể chuyển sang project khác.");
-        TRIGGER_MSG.put("A task cannot depend on itself", "Task không thể phụ thuộc vào chính nó.");
+                "Cannot move this task to another project because it has existing dependencies.");
+        TRIGGER_MSG.put("A task cannot depend on itself", "A task cannot depend on itself.");
         TRIGGER_MSG.put("This dependency would create a circular dependency",
-                "Phụ thuộc này tạo ra vòng lặp (A cần B, B cần A...).");
+                "This dependency would create a circular loop (e.g., A requires B, B requires A...).");
         TRIGGER_MSG.put("Dependent and prerequisite task must belong to the same project",
-                "Hai task phụ thuộc nhau phải thuộc cùng một project.");
+                "Dependent and prerequisite tasks must belong to the same project.");
+        TRIGGER_MSG.put("A task that has already started cannot get an unfinished prerequisite",
+                "Cannot add an unfinished prerequisite to a task that has already started.");
+        TRIGGER_MSG.put("A dependency cannot be updated; delete it and insert a new one",
+                "Cannot update a dependency; please delete it and insert a new one.");
+        TRIGGER_MSG.put("Joined date is before the volunteer registered date",
+                "Joined date cannot be earlier than the volunteer's registration date.");
+        TRIGGER_MSG.put("Joined date is before the team was created",
+                "Joined date cannot be earlier than the team's creation date.");
+        TRIGGER_MSG.put("This team already has a current Leader",
+                "This team already has a current Leader.");
 
-        CHECK_MSG.put("ck_task_priority", "Priority phải là LOW, MEDIUM, HIGH hoặc URGENT.");
-        CHECK_MSG.put("ck_task_status", "Status phải là TODO, IN_PROGRESS, DONE hoặc CANCELLED.");
-        CHECK_MSG.put("ck_task_title", "Tiêu đề task không được để trống.");
-        CHECK_MSG.put("ck_task_hours", "Số giờ ước tính phải lớn hơn 0.");
-        CHECK_MSG.put("ck_project_dates", "Ngày hết hạn phải lớn hơn hoặc bằng ngày bắt đầu.");
-        CHECK_MSG.put("ck_comment_not_empty", "Nội dung bình luận không được để trống.");
-        CHECK_MSG.put("ck_attachment_filename", "Tên file đính kèm không được để trống.");
-        CHECK_MSG.put("ck_attachment_filepath", "Đường dẫn file đính kèm không được để trống.");
+        CHECK_MSG.put("ck_membership_dates", "Left date must be on or after the joined date.");
+        CHECK_MSG.put("ck_project_name", "Project name cannot be empty.");
+        CHECK_MSG.put("ck_task_priority", "Priority must be LOW, MEDIUM, HIGH, or URGENT.");
+        CHECK_MSG.put("ck_task_status", "Status must be TODO, IN_PROGRESS, DONE, or CANCELLED.");
+        CHECK_MSG.put("ck_task_title", "Task title cannot be empty.");
+        CHECK_MSG.put("ck_task_hours", "Estimated hours must be greater than 0.");
+        CHECK_MSG.put("ck_project_dates", "Due date must be on or after the start date.");
+        CHECK_MSG.put("ck_comment_not_empty", "Comment content cannot be empty.");
+        CHECK_MSG.put("ck_attachment_filename", "Attachment filename cannot be empty.");
+        CHECK_MSG.put("ck_attachment_filepath", "Attachment file path cannot be empty.");
     }
 
     public DataAccessException(String userMessage, Throwable cause) {
@@ -55,24 +68,46 @@ public class DataAccessException extends RuntimeException {
                 msg = TRIGGER_MSG.getOrDefault(raw, raw);
                 break;
             case 3819: // CHECK violated
-                msg = "Dữ liệu không hợp lệ (vi phạm ràng buộc kiểm tra).";
+                msg = "Invalid data (check constraint violated).";
                 for (Map.Entry<String, String> en : CHECK_MSG.entrySet()) {
                     if (raw.contains(en.getKey())) { msg = en.getValue(); break; }
                 }
                 break;
-            case 1062: msg = "Dữ liệu bị trùng với bản ghi đã tồn tại."; break;
-            case 1451: msg = "Không thể xóa/sửa vì dữ liệu đang được bản ghi khác sử dụng."; break;
-            case 1452: msg = "Dữ liệu tham chiếu không tồn tại (Project/Team/Volunteer/Task không hợp lệ)."; break;
-            case 1048: msg = "Thiếu thông tin bắt buộc (có trường không được để trống)."; break;
-            case 1406: msg = "Dữ liệu nhập quá dài so với giới hạn của trường."; break;
-            case 1292: case 1366: msg = "Giá trị nhập sai định dạng (ngày/số)."; break;
-            case 1045: msg = "Sai tên đăng nhập hoặc mật khẩu MySQL (kiểm tra config/db.properties)."; break;
-            case 1049: msg = "Chưa có database ngo_task_mgmt. Hãy chạy các file .sql trước."; break;
+            case 1062:
+                if (raw.contains("uq_membership_one_current"))
+                    msg = "This volunteer is already an active member of the team.";
+                else if (raw.contains("uq_membership_same_day"))
+                    msg = "A membership record for this team on the same date already exists.";
+                else
+                    msg = "Duplicate data conflicts with an existing record.";
+                break;
+            case 1451:
+                msg = "Cannot delete or update because this record is referenced by other data.";
+                break;
+            case 1452:
+                msg = "Referenced record does not exist (invalid Project, Team, Volunteer, or Task).";
+                break;
+            case 1048:
+                msg = "Missing required information (a mandatory field cannot be empty).";
+                break;
+            case 1406:
+                msg = "Input data exceeds the maximum allowed field length.";
+                break;
+            case 1292:
+            case 1366:
+                msg = "Invalid value format (date or number).";
+                break;
+            case 1045:
+                msg = "Invalid MySQL username or password (check config/db.properties).";
+                break;
+            case 1049:
+                msg = "Database ngo_task_mgmt does not exist. Please run the .sql scripts first.";
+                break;
             default:
                 if (e.getSQLState() != null && e.getSQLState().startsWith("08")) {
-                    msg = "Không kết nối được tới MySQL. Kiểm tra MySQL đã chạy và db.url trong config/db.properties.";
+                    msg = "Cannot connect to MySQL. Ensure MySQL is running and verify db.url in config/db.properties.";
                 } else {
-                    msg = "Có lỗi cơ sở dữ liệu. Vui lòng thử lại hoặc liên hệ quản trị.";
+                    msg = "A database error occurred. Please try again or contact the administrator.";
                 }
         }
         return new DataAccessException(msg, e);

@@ -14,23 +14,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * CRUD cho TASK.
- * - Các hàm nhận Connection: dùng bên trong transaction (do Service quản lý commit/rollback).
- * - Các hàm không nhận Connection: tự mở/đóng kết nối, dùng cho thao tác đơn lẻ.
- * Luôn dùng PreparedStatement (chống SQL injection).
+ * CRUD for TASK.
+ * - Methods accepting Connection: used inside transactions (commit/rollback managed by Service).
+ * - Methods without Connection: open/close connections automatically, used for standalone operations.
+ * Always uses PreparedStatement (prevents SQL injection).
  */
 public class TaskDAO {
     private static final String COLS =
             "task_id, project_id, team_id, title, description, priority, status, estimated_hours, due_date";
 
-    /** Tiêu đề cột cho lưới Browse (khớp với browseRows). */
+    /** Column headers for the Browse grid (matches browseRows). */
     public static final String[] BROWSE_COLUMNS =
-            {"ID", "Tiêu đề", "Team", "Ưu tiên", "Trạng thái", "Hạn", "Người thực hiện"};
+            {"ID", "Title", "Team", "Priority", "Status", "Due Date", "Assignees"};
 
     // ---------------- CREATE ----------------
     public int insert(Connection c, Task t) throws SQLException {
         String sql = "INSERT INTO TASK (project_id, team_id, title, description, priority, status, "
-                + "estimated_hours, due_date) VALUES (?,?,?,?,?,?,?,?)";
+                   + "estimated_hours, due_date) VALUES (?,?,?,?,?,?,?,?)";
         try (PreparedStatement ps = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             bind(ps, t);
             ps.executeUpdate();
@@ -64,7 +64,7 @@ public class TaskDAO {
         }
     }
 
-    /** Search form: lọc động nhưng vẫn tham số hoá hoàn toàn. Tham số nào null/rỗng thì bỏ qua. */
+    /** Search form: dynamic filtering while remaining fully parameterized. Null or blank parameters are ignored. */
     public List<Task> search(Integer projectId, String keyword, String status, String priority) {
         StringBuilder sql = new StringBuilder("SELECT " + COLS + " FROM TASK WHERE 1=1");
         List<Object> params = new ArrayList<>();
@@ -104,19 +104,19 @@ public class TaskDAO {
     }
 
     /**
-     * Browse / Master-Detail: các task của 1 project, kèm tên team và danh sách người thực hiện.
-     * Trả về List<Object[]> để đổ thẳng vào DefaultTableModel (JTable).
+     * Browse / Master-Detail: tasks of a single project, including team name and list of assignees.
+     * Returns List<Object[]> to populate directly into DefaultTableModel (JTable).
      */
     public List<Object[]> browseRows(int projectId) {
-        String sql = "SELECT t.task_id, t.title, tm.team_name, t.priority, t.status, t.due_date, "
-                + "       GROUP_CONCAT(v.full_name ORDER BY v.full_name SEPARATOR ', ') AS assignees "
-                + "FROM TASK t "
-                + "JOIN TEAM tm ON tm.team_id = t.team_id "
-                + "LEFT JOIN TASK_ASSIGNMENT a ON a.task_id = t.task_id "
-                + "LEFT JOIN VOLUNTEER v ON v.volunteer_id = a.volunteer_id "
-                + "WHERE t.project_id = ? "
-                + "GROUP BY t.task_id, t.title, tm.team_name, t.priority, t.status, t.due_date "
-                + "ORDER BY t.task_id";
+        String sql = "SELECT t.task_id, t.title, tm.team_name, t.priority, t.status, t.due_date, " +
+                     "       GROUP_CONCAT(v.full_name ORDER BY v.full_name SEPARATOR ', ') AS assignees " +
+                     "FROM TASK t " +
+                     "JOIN TEAM tm ON tm.team_id = t.team_id " +
+                     "LEFT JOIN TASK_ASSIGNMENT a ON a.task_id = t.task_id " +
+                     "LEFT JOIN VOLUNTEER v ON v.volunteer_id = a.volunteer_id " +
+                     "WHERE t.project_id = ? " +
+                     "GROUP BY t.task_id, t.title, tm.team_name, t.priority, t.status, t.due_date " +
+                     "ORDER BY t.task_id";
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, projectId);
@@ -125,10 +125,14 @@ public class TaskDAO {
                 while (rs.next()) {
                     Date due = rs.getDate("due_date");
                     rows.add(new Object[]{
-                            rs.getInt("task_id"), rs.getString("title"), rs.getString("team_name"),
-                            rs.getString("priority"), rs.getString("status"),
+                            rs.getInt("task_id"),
+                            rs.getString("title"),
+                            rs.getString("team_name"),
+                            rs.getString("priority"),
+                            rs.getString("status"),
                             due == null ? "" : due.toLocalDate().toString(),
-                            rs.getString("assignees") == null ? "" : rs.getString("assignees")});
+                            rs.getString("assignees") == null ? "" : rs.getString("assignees")
+                    });
                 }
                 return rows;
             }
@@ -136,20 +140,20 @@ public class TaskDAO {
             throw DataAccessException.from(e);
         }
     }
-    
+
     /**
-     * Search form: giống search() nhưng trả về dòng cho JTable, cùng 7 cột với browseRows()
-     * (dùng chung BROWSE_COLUMNS). Tham số nào null hoặc rỗng thì bỏ qua điều kiện đó.
+     * Search form: similar to search() but returns rows for JTable, matching the 7 columns of browseRows()
+     * (shares BROWSE_COLUMNS). Null or blank parameters are ignored.
      */
     public List<Object[]> searchRows(Integer projectId, String keyword, String status, String priority) {
         StringBuilder sql = new StringBuilder(
-                "SELECT t.task_id, t.title, tm.team_name, t.priority, t.status, t.due_date, "
-                + "GROUP_CONCAT(v.full_name ORDER BY v.full_name SEPARATOR ', ') AS assignees "
-                + "FROM TASK t "
-                + "JOIN TEAM tm ON tm.team_id = t.team_id "
-                + "LEFT JOIN TASK_ASSIGNMENT a ON a.task_id = t.task_id "
-                + "LEFT JOIN VOLUNTEER v ON v.volunteer_id = a.volunteer_id "
-                + "WHERE 1=1");
+                "SELECT t.task_id, t.title, tm.team_name, t.priority, t.status, t.due_date, " +
+                "GROUP_CONCAT(v.full_name ORDER BY v.full_name SEPARATOR ', ') AS assignees " +
+                "FROM TASK t " +
+                "JOIN TEAM tm ON tm.team_id = t.team_id " +
+                "LEFT JOIN TASK_ASSIGNMENT a ON a.task_id = t.task_id " +
+                "LEFT JOIN VOLUNTEER v ON v.volunteer_id = a.volunteer_id " +
+                "WHERE 1=1");
         List<Object> params = new ArrayList<>();
         if (projectId != null) {
             sql.append(" AND t.project_id = ?");
@@ -183,10 +187,14 @@ public class TaskDAO {
                     Date due = rs.getDate("due_date");
                     String assignees = rs.getString("assignees");
                     rows.add(new Object[]{
-                            rs.getInt("task_id"), rs.getString("title"), rs.getString("team_name"),
-                            rs.getString("priority"), rs.getString("status"),
+                            rs.getInt("task_id"),
+                            rs.getString("title"),
+                            rs.getString("team_name"),
+                            rs.getString("priority"),
+                            rs.getString("status"),
                             due == null ? "" : due.toLocalDate().toString(),
-                            assignees == null ? "" : assignees});
+                            assignees == null ? "" : assignees
+                    });
                 }
                 return rows;
             }
@@ -194,11 +202,11 @@ public class TaskDAO {
             throw DataAccessException.from(e);
         }
     }
-    
+
     // ---------------- UPDATE ----------------
     public int update(Connection c, Task t) throws SQLException {
         String sql = "UPDATE TASK SET project_id=?, team_id=?, title=?, description=?, priority=?, "
-                + "status=?, estimated_hours=?, due_date=? WHERE task_id=?";
+                   + "status=?, estimated_hours=?, due_date=? WHERE task_id=?";
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             bind(ps, t);
             ps.setInt(9, t.getTaskId());
@@ -215,7 +223,7 @@ public class TaskDAO {
     }
 
     // ---------------- DELETE ----------------
-    /** Xoá TASK sẽ CASCADE sang TASK_ASSIGNMENT, TASK_COMMENT, ATTACHMENT, TASK_DEPENDENCY. */
+    /** Deleting a TASK will CASCADE to TASK_ASSIGNMENT, TASK_COMMENT, ATTACHMENT, and TASK_DEPENDENCY. */
     public int delete(Connection c, int taskId) throws SQLException {
         try (PreparedStatement ps = c.prepareStatement("DELETE FROM TASK WHERE task_id = ?")) {
             ps.setInt(1, taskId);

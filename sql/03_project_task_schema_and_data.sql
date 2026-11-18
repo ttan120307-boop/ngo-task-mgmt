@@ -1,13 +1,13 @@
 -- =====================================================================
 -- IT079IU - Topic 6: Volunteer/NGO Project and Task Management
--- Module 2: Project & Task (PROJECT, TASK, TASK_DEPENDENCY)
+-- Module 2: Project & Task (PROJECT, TASK, TASK_DEPENDENCY, LABEL, TASK_LABEL)
 --
 -- DBMS: MySQL 8.0.16 or later (CHECK enforced, InnoDB).
 -- HOW TO RUN: run 01_foundation_schema_and_data.sql FIRST. It creates the
 -- database ngo_task_mgmt and the tables VOLUNTEER and TEAM that this module
 -- references. This file does NOT contain DROP DATABASE (only the master
--- script may). To re-run this module alone, the three DROP TABLE lines
--- below remove only this module's tables.
+-- script may). To re-run this module alone, the DROP TABLE lines
+-- below remove only this module's five tables.
 --
 -- MySQL-specific features used (not standard SQL):
 --   * DEFAULT (CURRENT_DATE)            expression default (8.0.13+)
@@ -24,9 +24,11 @@
 -- =====================================================================
 USE ngo_task_mgmt;
 
+DROP TABLE IF EXISTS TASK_LABEL;        -- child tables first
 DROP TABLE IF EXISTS TASK_DEPENDENCY;
 DROP TABLE IF EXISTS TASK;
 DROP TABLE IF EXISTS PROJECT;
+DROP TABLE IF EXISTS LABEL;
 
 -- ---------------------------------------------------------------------
 -- 1. PROJECT  (high-level work of the NGO; owned by one volunteer)
@@ -101,6 +103,42 @@ CREATE TABLE TASK_DEPENDENCY (
 ) ENGINE = InnoDB;
 -- The primary key serves lookups by dependent task; the foreign key on
 -- prerequisite_task_id creates the index for the reverse lookup.
+
+-- ---------------------------------------------------------------------
+-- 4. LABEL  (a tag such as 'Fundraising' that can be put on many tasks)
+--    label_name is UNIQUE: two labels with the same name would make the
+--    tags meaningless. This adds a second candidate key {label_name} and
+--    the dependency label_name -> label_id to the normalization document
+--    (section II.7); LABEL stays in BCNF because both determinants are
+--    candidate keys.
+-- ---------------------------------------------------------------------
+CREATE TABLE LABEL (
+    label_id    INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    label_name  VARCHAR(50)   NOT NULL,
+    CONSTRAINT pk_label       PRIMARY KEY (label_id),
+    CONSTRAINT uq_label_name  UNIQUE (label_name),
+    CONSTRAINT ck_label_name  CHECK (CHAR_LENGTH(TRIM(label_name)) > 0)
+) ENGINE = InnoDB;
+
+-- ---------------------------------------------------------------------
+-- 5. TASK_LABEL  (resolves the many-to-many relationship TASK - LABEL)
+--    Deleting a task or a label removes only the link row (CASCADE); the
+--    other side is untouched. A task may have no label, and a label may
+--    be unused.
+-- ---------------------------------------------------------------------
+CREATE TABLE TASK_LABEL (
+    task_id   INT UNSIGNED NOT NULL,
+    label_id  INT UNSIGNED NOT NULL,
+    CONSTRAINT pk_task_label PRIMARY KEY (task_id, label_id),
+    CONSTRAINT fk_tasklabel_task FOREIGN KEY (task_id)
+        REFERENCES TASK (task_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_tasklabel_label FOREIGN KEY (label_id)
+        REFERENCES LABEL (label_id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE = InnoDB;
+-- The primary key serves "labels of a task"; the foreign key on label_id
+-- creates the index for "tasks that carry a label".
 
 -- ---------------------------------------------------------------------
 -- Cross-row rules that CHECK cannot express (triggers):
@@ -219,7 +257,8 @@ END//
 DELIMITER ;
 
 -- =====================================================================
--- Sample data. Fictional. 6 / 30 / 27 rows.
+-- Sample data. Fictional. 6 / 30 / 27 / 10 / 29 rows
+-- (PROJECT / TASK / TASK_DEPENDENCY / LABEL / TASK_LABEL).
 -- Owners and teams are taken from module 1 (volunteers 1-16, teams 1-15).
 -- Rows are inserted so that every trigger rule is already satisfied.
 -- =====================================================================
@@ -279,6 +318,28 @@ INSERT INTO TASK_DEPENDENCY (dependent_task_id, prerequisite_task_id) VALUES
  (22, 21), (23, 21), (23, 22), (24, 23), (25, 23), (25, 24),               -- project 5
  (27, 26), (28, 26), (29, 27), (29, 28);                                   -- project 6
 
+INSERT INTO LABEL (label_id, label_name) VALUES
+ ( 1, 'Fieldwork'),
+ ( 2, 'Fundraising'),
+ ( 3, 'Training'),
+ ( 4, 'Logistics'),
+ ( 5, 'Communication'),
+ ( 6, 'Documentation'),
+ ( 7, 'Safety'),
+ ( 8, 'Design'),
+ ( 9, 'Finance'),
+ (10, 'Planning');
+
+INSERT INTO TASK_LABEL (task_id, label_id) VALUES
+ ( 1,  1), ( 2,  9), ( 3,  4), ( 4,  1), ( 4,  4), ( 5,  3),          -- project 1
+ ( 6, 10), ( 7,  4), ( 8,  2), ( 8,  9), ( 9,  8), (10,  5), (11,  4), -- project 2
+ (12,  6), (14,  3), (15,  5),                                         -- project 3
+ (16,  7), (16,  1), (17,  4), (18,  4), (19,  1), (20,  6),           -- project 4
+ (22,  8), (24,  6), (25,  5),                                         -- project 5 (task 23 has no label)
+ (26, 10), (27,  7), (28,  2), (29,  4);                               -- project 6 (task 30 has no label)
+
 SELECT 'PROJECT' AS table_name, COUNT(*) AS row_count FROM PROJECT
 UNION ALL SELECT 'TASK',            COUNT(*) FROM TASK
-UNION ALL SELECT 'TASK_DEPENDENCY', COUNT(*) FROM TASK_DEPENDENCY;
+UNION ALL SELECT 'TASK_DEPENDENCY', COUNT(*) FROM TASK_DEPENDENCY
+UNION ALL SELECT 'LABEL',           COUNT(*) FROM LABEL
+UNION ALL SELECT 'TASK_LABEL',      COUNT(*) FROM TASK_LABEL;
