@@ -13,29 +13,32 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Browse (Master) + CRUD cho PROJECT. */
+/** Browse (Master) + CRUD for PROJECT. */
 public class ProjectDAO {
-    public static final String[] BROWSE_COLUMNS = {"ID", "Tên project", "Chủ sở hữu", "Bắt đầu", "Hạn", "Số task"};
+    public static final String[] BROWSE_COLUMNS = {"ID", "Project Name", "Owner", "Start Date", "Due Date", "Task Count"};
 
     // ---------------- BROWSE ----------------
     public List<Object[]> browseRows() {
-        String sql = "SELECT p.project_id, p.project_name, v.full_name AS owner_name, "
-                + "       p.start_date, p.due_date, COUNT(t.task_id) AS task_count "
-                + "FROM PROJECT p "
-                + "JOIN VOLUNTEER v ON v.volunteer_id = p.owner_id "
-                + "LEFT JOIN TASK t ON t.project_id = p.project_id "
-                + "GROUP BY p.project_id, p.project_name, v.full_name, p.start_date, p.due_date "
-                + "ORDER BY p.project_id";
+        String sql = "SELECT p.project_id, p.project_name, v.full_name AS owner_name, " +
+                     "       p.start_date, p.due_date, COUNT(t.task_id) AS task_count " +
+                     "FROM PROJECT p " +
+                     "JOIN VOLUNTEER v ON v.volunteer_id = p.owner_id " +
+                     "LEFT JOIN TASK t ON t.project_id = p.project_id " +
+                     "GROUP BY p.project_id, p.project_name, v.full_name, p.start_date, p.due_date " +
+                     "ORDER BY p.project_id";
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             List<Object[]> rows = new ArrayList<>();
             while (rs.next()) {
                 rows.add(new Object[]{
-                        rs.getInt("project_id"), rs.getString("project_name"), rs.getString("owner_name"),
+                        rs.getInt("project_id"),
+                        rs.getString("project_name"),
+                        rs.getString("owner_name"),
                         rs.getDate("start_date").toLocalDate().toString(),
                         rs.getDate("due_date").toLocalDate().toString(),
-                        rs.getInt("task_count")});
+                        rs.getInt("task_count")
+                });
             }
             return rows;
         } catch (SQLException e) {
@@ -44,10 +47,10 @@ public class ProjectDAO {
     }
 
     // ---------------- CREATE ----------------
-    /** Trả về project_id mới. */
+    /** Returns the newly generated project_id. */
     public int insert(Project p) {
-        String sql = "INSERT INTO PROJECT (owner_id, project_name, description, start_date, due_date) "
-                + "VALUES (?,?,?,?,?)";
+        String sql = "INSERT INTO PROJECT (owner_id, project_name, description, start_date, due_date) " +
+                     "VALUES (?,?,?,?,?)";
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             bind(ps, p);
@@ -63,10 +66,10 @@ public class ProjectDAO {
     }
 
     // ---------------- READ ONE ----------------
-    /** Trả về null nếu không tồn tại. */
+    /** Returns null if not found. */
     public Project findById(int projectId) {
-        String sql = "SELECT project_id, owner_id, project_name, description, start_date, due_date "
-                + "FROM PROJECT WHERE project_id = ?";
+        String sql = "SELECT project_id, owner_id, project_name, description, start_date, due_date " +
+                     "FROM PROJECT WHERE project_id = ?";
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, projectId);
@@ -88,8 +91,8 @@ public class ProjectDAO {
 
     // ---------------- UPDATE ----------------
     public int update(Project p) {
-        String sql = "UPDATE PROJECT SET owner_id=?, project_name=?, description=?, start_date=?, due_date=? "
-                + "WHERE project_id=?";
+        String sql = "UPDATE PROJECT SET owner_id=?, project_name=?, description=?, start_date=?, due_date=? " +
+                     "WHERE project_id=?";
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             bind(ps, p);
@@ -101,7 +104,7 @@ public class ProjectDAO {
     }
 
     // ---------------- DELETE ----------------
-    /** CẨN THẬN: xóa project sẽ CASCADE xóa mọi task của nó (và phân công, bình luận, tệp, phụ thuộc). */
+    /** CAUTION: deleting a project will CASCADE delete all of its tasks (along with assignments, comments, attachments, and dependencies). */
     public int delete(int projectId) {
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("DELETE FROM PROJECT WHERE project_id = ?")) {
@@ -112,7 +115,7 @@ public class ProjectDAO {
         }
     }
 
-    /** Số task thuộc project: dùng để hiện cảnh báo trong hộp thoại xác nhận xóa. */
+    /** Number of tasks belonging to the project: used to display a warning in the delete confirmation dialog. */
     public int countTasks(int projectId) {
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("SELECT COUNT(*) FROM TASK WHERE project_id = ?")) {
