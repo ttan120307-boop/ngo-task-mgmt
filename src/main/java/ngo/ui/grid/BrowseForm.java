@@ -24,11 +24,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 /**
- * Browse form: hiển thị danh sách Task lên lưới (JTable), lọc theo Project.
- * Dữ liệu lấy từ TaskDAO.browseRows / searchRows, tải trong luồng nền để giao diện không bị treo.
+ * Browse form: displays the list of Tasks in a grid (JTable), filtered by Project.
+ * Data is fetched from TaskDAO.browseRows / searchRows and loaded on a background thread to keep the UI responsive.
  */
 public class BrowseForm extends JFrame {
-    private static final ComboItem ALL = new ComboItem(-1, "Tất cả project");
+    private static final ComboItem ALL = new ComboItem(-1, "All Projects");
 
     private final TaskDAO taskDAO = new TaskDAO();
     private final LookupDAO lookupDAO = new LookupDAO();
@@ -36,11 +36,10 @@ public class BrowseForm extends JFrame {
     private final JComboBox<ComboItem> cboProject = new JComboBox<>();
     private final JLabel lblCount = new JLabel(" ");
     private final DefaultTableModel model = new DefaultTableModel(TaskDAO.BROWSE_COLUMNS, 0) {
-        @Override
-        public boolean isCellEditable(int row, int col) { return false; }   // lưới chỉ để xem
+        @Override public boolean isCellEditable(int row, int col) { return false; }   // read-only grid
     };
     private final JTable table = new JTable(model);
-    private boolean adjusting = false;   // true khi đang nạp combobox, tránh tải lưới nhiều lần
+    private boolean adjusting = false;   // true while populating combobox to avoid redundant grid reloads
 
     public BrowseForm() {
         super("Browse Tasks");
@@ -48,7 +47,7 @@ public class BrowseForm extends JFrame {
         setSize(1000, 520);
         setLocationRelativeTo(null);
 
-        JButton btnRefresh = new JButton("Làm mới");
+        JButton btnRefresh = new JButton("Refresh");
         btnRefresh.addActionListener(e -> loadTasks());
         cboProject.addActionListener(e -> {
             if (!adjusting) loadTasks();
@@ -59,7 +58,7 @@ public class BrowseForm extends JFrame {
         top.add(cboProject);
         top.add(btnRefresh);
 
-        table.setAutoCreateRowSorter(true);          // bấm tiêu đề cột để sắp xếp
+        table.setAutoCreateRowSorter(true);          // click column headers to sort
         table.setFillsViewportHeight(true);
 
         add(top, BorderLayout.NORTH);
@@ -85,23 +84,21 @@ public class BrowseForm extends JFrame {
         ComboItem sel = (ComboItem) cboProject.getSelectedItem();
         if (sel == null) return;
         runAsync(() -> sel.getId() == ALL.getId()
-                        ? taskDAO.searchRows(null, null, null, null)   // mọi project
+                        ? taskDAO.searchRows(null, null, null, null)   // all projects
                         : taskDAO.browseRows(sel.getId()),
                 (List<Object[]> rows) -> {
                     model.setRowCount(0);
                     for (Object[] r : rows) model.addRow(r);
-                    lblCount.setText("  " + rows.size() + " task");
+                    lblCount.setText("  " + rows.size() + " task(s)");
                 });
     }
 
-    /** Chạy việc nặng (gọi DB) ở luồng nền, rồi cập nhật giao diện ở luồng giao diện. */
+    /** Runs heavy work (DB calls) on a background thread, then updates the UI on the EDT. */
     private <T> void runAsync(Callable<T> work, Consumer<T> onDone) {
         new SwingWorker<T, Void>() {
-            @Override
-            protected T doInBackground() throws Exception { return work.call(); }
+            @Override protected T doInBackground() throws Exception { return work.call(); }
 
-            @Override
-            protected void done() {
+            @Override protected void done() {
                 try {
                     onDone.accept(get());
                 } catch (InterruptedException ie) {
@@ -116,8 +113,8 @@ public class BrowseForm extends JFrame {
     private void showError(Throwable cause) {
         String msg = (cause instanceof DataAccessException || cause instanceof IllegalArgumentException)
                 ? cause.getMessage()
-                : "Có lỗi không mong muốn. Vui lòng thử lại.";
-        JOptionPane.showMessageDialog(this, msg, "Lỗi", JOptionPane.ERROR_MESSAGE);
+                : "An unexpected error occurred. Please try again.";
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
     }
 
     public static void main(String[] args) {
