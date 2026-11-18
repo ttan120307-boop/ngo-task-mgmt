@@ -85,3 +85,8 @@ public class TaskDependencyDAO {
                 while (rs.next()) list.add(new Object[]{rs.getInt(1), rs.getString(2), rs.getString(3)});
                 return list;
             }
+        } catch (SQLException e) {
+            throw DataAccessException.from(e);
+        }
+    }
+}
