@@ -12,32 +12,32 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * TASK_DEPENDENCY: "task A cần task B xong trước".
- * Thêm và xóa ngay trong form Task. Các lỗi (tự phụ thuộc, vòng lặp, khác project...)
- * do trigger báo và đã được dịch sang tiếng Việt trong DataAccessException.
+ * TASK_DEPENDENCY: "task A requires task B to be completed first".
+ * Added and removed directly within the Task form. Errors (self-dependency, circular dependency, different projects...)
+ * are raised by triggers and translated into user-friendly messages in DataAccessException.
  */
 public class TaskDependencyDAO {
-    public static final String[] COLUMNS = {"ID", "Tiêu đề", "Trạng thái"};
+    public static final String[] COLUMNS = {"ID", "Title", "Status"};
 
-    /** Các task tiên quyết của một task (phải xong trước). Cột: ID, Tiêu đề, Trạng thái. */
+    /** Prerequisite tasks of a task (must be completed first). Columns: ID, Title, Status. */
     public List<Object[]> prerequisitesOf(int taskId) {
-        return rows("SELECT t.task_id, t.title, t.status FROM TASK_DEPENDENCY d "
-                + "JOIN TASK t ON t.task_id = d.prerequisite_task_id "
-                + "WHERE d.dependent_task_id = ? ORDER BY t.task_id", taskId);
+        return rows("SELECT t.task_id, t.title, t.status FROM TASK_DEPENDENCY d " +
+                    "JOIN TASK t ON t.task_id = d.prerequisite_task_id " +
+                    "WHERE d.dependent_task_id = ? ORDER BY t.task_id", taskId);
     }
 
-    /** Các task đang phụ thuộc vào task này. Cột: ID, Tiêu đề, Trạng thái. */
+    /** Tasks that depend on this task. Columns: ID, Title, Status. */
     public List<Object[]> dependentsOf(int taskId) {
-        return rows("SELECT t.task_id, t.title, t.status FROM TASK_DEPENDENCY d "
-                + "JOIN TASK t ON t.task_id = d.dependent_task_id "
-                + "WHERE d.prerequisite_task_id = ? ORDER BY t.task_id", taskId);
+        return rows("SELECT t.task_id, t.title, t.status FROM TASK_DEPENDENCY d " +
+                    "JOIN TASK t ON t.task_id = d.dependent_task_id " +
+                    "WHERE d.prerequisite_task_id = ? ORDER BY t.task_id", taskId);
     }
 
-    /** Task cùng project (trừ chính nó): dùng cho combobox "thêm task tiên quyết". */
+    /** Tasks in the same project (excluding itself): used for the "add prerequisite task" ComboBox. */
     public List<ComboItem> candidatePrerequisites(int taskId) {
-        String sql = "SELECT t.task_id, t.title FROM TASK t "
-                + "WHERE t.project_id = (SELECT project_id FROM TASK WHERE task_id = ?) "
-                + "AND t.task_id <> ? ORDER BY t.task_id";
+        String sql = "SELECT t.task_id, t.title FROM TASK t " +
+                     "WHERE t.project_id = (SELECT project_id FROM TASK WHERE task_id = ?) " +
+                     "AND t.task_id <> ? ORDER BY t.task_id";
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, taskId);
@@ -52,11 +52,10 @@ public class TaskDependencyDAO {
         }
     }
 
-    /** dependentTaskId cần prerequisiteTaskId xong trước. */
+    /** dependentTaskId requires prerequisiteTaskId to be completed first. */
     public void add(int dependentTaskId, int prerequisiteTaskId) {
         try (Connection c = DBConnection.getConnection();
-             PreparedStatement ps = c.prepareStatement(
-                     "INSERT INTO TASK_DEPENDENCY (dependent_task_id, prerequisite_task_id) VALUES (?, ?)")) {
+             PreparedStatement ps = c.prepareStatement("INSERT INTO TASK_DEPENDENCY (dependent_task_id, prerequisite_task_id) VALUES (?, ?)")) {
             ps.setInt(1, dependentTaskId);
             ps.setInt(2, prerequisiteTaskId);
             ps.executeUpdate();
@@ -65,11 +64,10 @@ public class TaskDependencyDAO {
         }
     }
 
-    /** Trả về số dòng đã xóa (0 nếu phụ thuộc không tồn tại). */
+    /** Returns the number of deleted rows (0 if the dependency does not exist). */
     public int remove(int dependentTaskId, int prerequisiteTaskId) {
         try (Connection c = DBConnection.getConnection();
-             PreparedStatement ps = c.prepareStatement(
-                     "DELETE FROM TASK_DEPENDENCY WHERE dependent_task_id = ? AND prerequisite_task_id = ?")) {
+             PreparedStatement ps = c.prepareStatement("DELETE FROM TASK_DEPENDENCY WHERE dependent_task_id = ? AND prerequisite_task_id = ?")) {
             ps.setInt(1, dependentTaskId);
             ps.setInt(2, prerequisiteTaskId);
             return ps.executeUpdate();
@@ -87,8 +85,3 @@ public class TaskDependencyDAO {
                 while (rs.next()) list.add(new Object[]{rs.getInt(1), rs.getString(2), rs.getString(3)});
                 return list;
             }
-        } catch (SQLException e) {
-            throw DataAccessException.from(e);
-        }
-    }
-}
