@@ -28,29 +28,29 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * Cửa sổ chính của ứng dụng: nơi mở tất cả các form.
- * Chạy lớp này (ngo.ui.MainFrame) để dùng toàn bộ chương trình.
+ * Main application window: central launcher for all forms.
+ * Run this class (ngo.ui.MainFrame) to use the entire application.
  *
- * Thêm form mới: thêm một dòng addButton(...) trong hàm group tương ứng ở constructor.
+ * To add a new form: add an addButton(...) line in the corresponding group inside the constructor.
  */
 public class MainFrame extends JFrame {
-    private final JLabel lblStatus = new JLabel(" Đang kiểm tra kết nối MySQL...");
+    private final JLabel lblStatus = new JLabel(" Checking MySQL connection...");
     private final Map<String, JFrame> openWindows = new HashMap<>();
 
     public MainFrame() {
         super("NGO Task Management");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
-        JLabel title = new JLabel("Quản lý công việc tình nguyện (NGO)", SwingConstants.CENTER);
+        JLabel title = new JLabel("NGO Volunteer Task Management", SwingConstants.CENTER);
         title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
         title.setBorder(BorderFactory.createEmptyBorder(14, 10, 6, 10));
 
-        JPanel view = group("Xem dữ liệu");
-        addButton(view, "Danh sách Task (Browse)", "browse", () -> new BrowseForm());
-        addButton(view, "Project và Task (Master-Detail)", "masterdetail", () -> new MasterDetailForm());
-        addButton(view, "Tìm kiếm Task (Search)", "search", () -> new SearchForm());
+        JPanel view = group("View Data");
+        addButton(view, "Task List (Browse)", "browse", () -> new BrowseForm());
+        addButton(view, "Projects & Tasks (Master-Detail)", "masterdetail", () -> new MasterDetailForm());
+        addButton(view, "Search Tasks (Search)", "search", () -> new SearchForm());
 
-        JPanel edit = group("Chỉnh sửa");
+        JPanel edit = group("Edit Data");
         addButton(edit, "Editing: Task, Project, Membership, Label, Dependency, Comment, Assignment", "editing", () -> {
             JFrame f = new JFrame("Editing & Validation");
             f.setContentPane(new EditingValidationPanel());
@@ -87,7 +87,7 @@ public class MainFrame extends JFrame {
         panel.add(b);
     }
 
-    /** Mở form. Bấm lại khi form đang mở thì đưa nó lên trước, không mở trùng. */
+    /** Opens a form. If clicked again while already open, brings it to the front instead of duplicating. */
     private void open(String key, Supplier<JFrame> factory) {
         JFrame existing = openWindows.get(key);
         if (existing != null && existing.isDisplayable()) {
@@ -96,19 +96,20 @@ public class MainFrame extends JFrame {
         }
         try {
             JFrame f = factory.get();
-            // Một số form đặt EXIT_ON_CLOSE: đổi để đóng form con không tắt cả chương trình.
+            // Some forms set EXIT_ON_CLOSE: override so closing a child form does not exit the whole app.
             f.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             f.setLocationRelativeTo(this);
             f.setVisible(true);
             openWindows.put(key, f);
         } catch (RuntimeException ex) {
             String msg = (ex instanceof DataAccessException || ex instanceof IllegalArgumentException)
-                    ? ex.getMessage() : "Không mở được form. Vui lòng thử lại.";
-            JOptionPane.showMessageDialog(this, msg, "Lỗi", JOptionPane.ERROR_MESSAGE);
+                    ? ex.getMessage()
+                    : "Unable to open form. Please try again.";
+            JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    /** Thử kết nối MySQL ở luồng nền và hiện kết quả ở thanh trạng thái. */
+    /** Tests the MySQL connection on a background thread and displays the result in the status bar. */
     private void checkConnection() {
         new SwingWorker<String, Void>() {
             private boolean ok;
@@ -117,14 +118,14 @@ public class MainFrame extends JFrame {
             protected String doInBackground() {
                 try (Connection c = DBConnection.getConnection()) {
                     ok = true;
-                    return " Đã kết nối MySQL";
+                    return " Connected to MySQL";
                 } catch (SQLException e) {
                     return " " + DataAccessException.from(e).getMessage();
-                } catch (Throwable t) {   // ví dụ thiếu file config/db.properties
+                } catch (Throwable t) {   // e.g., missing config/db.properties file
                     Throwable root = (t instanceof ExceptionInInitializerError && t.getCause() != null)
-                            ? t.getCause() : t;
-                    return " " + (root.getMessage() != null ? root.getMessage()
-                            : "Không kết nối được cơ sở dữ liệu.");
+                            ? t.getCause()
+                            : t;
+                    return " " + (root.getMessage() != null ? root.getMessage() : "Unable to connect to the database.");
                 }
             }
 
@@ -134,7 +135,7 @@ public class MainFrame extends JFrame {
                     lblStatus.setText(get());
                     lblStatus.setForeground(ok ? new Color(0, 120, 0) : new Color(180, 0, 0));
                 } catch (Exception ignored) {
-                    // giữ nguyên thông báo cũ
+                    // keep previous message
                 }
             }
         }.execute();
@@ -149,7 +150,7 @@ public class MainFrame extends JFrame {
                 }
             }
         } catch (Exception ignored) {
-            // dùng giao diện mặc định
+            // use default look and feel
         }
         SwingUtilities.invokeLater(() -> new MainFrame().setVisible(true));
     }
