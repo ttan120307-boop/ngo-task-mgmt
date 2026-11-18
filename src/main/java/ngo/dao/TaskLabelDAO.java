@@ -13,31 +13,31 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * LABEL (bảng tra cứu, chỉ đọc) và TASK_LABEL (gắn nhãn cho task, thêm và xóa ngay trong form Task).
- * Dùng ComboItem để đổ thẳng vào JComboBox / JList.
+ * LABEL (lookup table, read-only) and TASK_LABEL (assigning labels to tasks, added and removed directly in the Task form).
+ * Uses ComboItem to populate directly into JComboBox / JList.
  */
 public class TaskLabelDAO {
 
-    /** Tất cả nhãn, sắp theo tên (bảng LABEL, chỉ đọc). */
+    /** All labels, sorted by name (LABEL table, read-only). */
     public List<ComboItem> allLabels() {
         return labels("SELECT label_id, label_name FROM LABEL ORDER BY label_name", null);
     }
 
-    /** Các nhãn đang gắn trên một task. */
+    /** Labels currently assigned to a task. */
     public List<ComboItem> labelsOf(int taskId) {
-        return labels("SELECT l.label_id, l.label_name FROM TASK_LABEL tl "
-                + "JOIN LABEL l ON l.label_id = tl.label_id "
-                + "WHERE tl.task_id = ? ORDER BY l.label_name", taskId);
+        return labels("SELECT l.label_id, l.label_name FROM TASK_LABEL tl " +
+                      "JOIN LABEL l ON l.label_id = tl.label_id " +
+                      "WHERE tl.task_id = ? ORDER BY l.label_name", taskId);
     }
 
-    /** Các nhãn CHƯA gắn trên task: dùng cho combobox "thêm nhãn". */
+    /** Labels NOT YET assigned to the task: used for the "add label" ComboBox. */
     public List<ComboItem> availableLabelsFor(int taskId) {
-        return labels("SELECT l.label_id, l.label_name FROM LABEL l "
-                + "WHERE l.label_id NOT IN (SELECT label_id FROM TASK_LABEL WHERE task_id = ?) "
-                + "ORDER BY l.label_name", taskId);
+        return labels("SELECT l.label_id, l.label_name FROM LABEL l " +
+                      "WHERE l.label_id NOT IN (SELECT label_id FROM TASK_LABEL WHERE task_id = ?) " +
+                      "ORDER BY l.label_name", taskId);
     }
 
-    /** Gắn nhãn cho task. Gắn trùng thì báo lỗi dễ hiểu. */
+    /** Assigns a label to a task. Throws a user-friendly error on duplicate assignment. */
     public void add(int taskId, int labelId) {
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("INSERT INTO TASK_LABEL (task_id, label_id) VALUES (?, ?)")) {
@@ -45,12 +45,13 @@ public class TaskLabelDAO {
             ps.setInt(2, labelId);
             ps.executeUpdate();
         } catch (SQLException e) {
-            if (e.getErrorCode() == 1062) throw new IllegalArgumentException("Task đã có nhãn này rồi.");
+            if (e.getErrorCode() == 1062)
+                throw new IllegalArgumentException("This task already has the selected label.");
             throw DataAccessException.from(e);
         }
     }
 
-    /** Gỡ nhãn khỏi task. Trả về số dòng đã xóa (0 nếu task không có nhãn đó). */
+    /** Removes a label from a task. Returns the number of deleted rows (0 if the task does not have that label). */
     public int remove(int taskId, int labelId) {
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("DELETE FROM TASK_LABEL WHERE task_id = ? AND label_id = ?")) {
@@ -63,9 +64,9 @@ public class TaskLabelDAO {
     }
 
     /**
-     * Đặt lại toàn bộ nhãn của task bằng đúng danh sách labelIds (xóa hết rồi thêm lại)
-     * trong MỘT transaction: lỗi giữa chừng thì nhãn cũ được giữ nguyên.
-     * Tiện khi form Task có danh sách tích chọn nhiều nhãn rồi bấm Lưu.
+     * Replaces all labels of a task with the given list of labelIds (deletes all, then re-inserts)
+     * in a SINGLE transaction: if an error occurs mid-way, the existing labels are preserved.
+     * Convenient when the Task form has a multi-select checkbox list of labels and the user clicks Save.
      */
     public void replaceLabels(int taskId, List<Integer> labelIds) {
         Tx.run(c -> {
@@ -73,9 +74,8 @@ public class TaskLabelDAO {
                 del.setInt(1, taskId);
                 del.executeUpdate();
             }
-            try (PreparedStatement ins = c.prepareStatement(
-                    "INSERT INTO TASK_LABEL (task_id, label_id) VALUES (?, ?)")) {
-                for (int labelId : new java.util.LinkedHashSet<>(labelIds)) {   // bỏ id trùng
+            try (PreparedStatement ins = c.prepareStatement("INSERT INTO TASK_LABEL (task_id, label_id) VALUES (?, ?)")) {
+                for (int labelId : new java.util.LinkedHashSet<>(labelIds)) {   // deduplicate IDs
                     ins.setInt(1, taskId);
                     ins.setInt(2, labelId);
                     ins.executeUpdate();
