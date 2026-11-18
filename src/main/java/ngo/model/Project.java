@@ -2,12 +2,12 @@ package ngo.model;
 
 import java.time.LocalDate;
 
-/** Ánh xạ bảng PROJECT. */
+/** Maps to the PROJECT table. */
 public class Project {
     private int projectId;
-    private int ownerId;                 // volunteer_id của người phụ trách
+    private int ownerId;                 // volunteer_id of the project owner
     private String projectName;
-    private String description;          // có thể null
+    private String description;          // nullable
     private LocalDate startDate;
     private LocalDate dueDate;
 
@@ -24,15 +24,15 @@ public class Project {
     public LocalDate getDueDate() { return dueDate; }
     public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
 
-    /** Validate phía Java. Trả về null nếu hợp lệ. */
+    /** Java-side validation. Returns null if valid. */
     public String validate() {
-        if (projectName == null || projectName.isBlank()) return "Tên project không được để trống.";
-        if (projectName.length() > 150) return "Tên project tối đa 150 ký tự.";
-        if (description != null && description.length() > 500) return "Mô tả tối đa 500 ký tự.";
-        if (ownerId <= 0) return "Phải chọn người phụ trách project.";
-        if (startDate == null) return "Phải nhập ngày bắt đầu.";
-        if (dueDate == null) return "Phải nhập ngày hết hạn.";
-        if (dueDate.isBefore(startDate)) return "Ngày hết hạn phải sau hoặc bằng ngày bắt đầu.";
+        if (projectName == null || projectName.isBlank()) return "Project name cannot be empty.";
+        if (projectName.length() > 150) return "Project name must be at most 150 characters.";
+        if (description != null && description.length() > 500) return "Description must be at most 500 characters.";
+        if (ownerId <= 0) return "Please select a project owner.";
+        if (startDate == null) return "Start date is required.";
+        if (dueDate == null) return "Due date is required.";
+        if (dueDate.isBefore(startDate)) return "Due date must be on or after the start date.";
         return null;
     }
 
