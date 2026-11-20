@@ -129,16 +129,20 @@ public final class UiStyle {
         return panel;
     }
 
-    private static void navigate(String menuName, JFrame currentFrame) {
+        private static void navigate(String menuName, JFrame currentFrame) {
         if (("Search tasks".equals(menuName) && currentFrame instanceof SearchForm)
                 || ("Projects".equals(menuName) && currentFrame instanceof MasterDetailForm)
                 || ("Browse".equals(menuName) && currentFrame instanceof ngo.ui.grid.BrowseForm)
+                || ("Report".equals(menuName) && currentFrame instanceof ngo.ui.report.ReportForm)
                 || ("Edit task".equals(menuName) && currentFrame instanceof EditTaskForm)) {
             return;
         }
 
         JFrame nextFrame = null;
         switch (menuName) {
+            case "Browse":
+                nextFrame = new ngo.ui.grid.BrowseForm();
+                break;
             case "Search tasks":
                 nextFrame = new SearchForm();
                 break;
@@ -148,14 +152,9 @@ public final class UiStyle {
             case "Edit task":
                 nextFrame = new EditTaskForm();
                 break;
-                        case "Browse":
-                nextFrame = new ngo.ui.grid.BrowseForm();
-                break;
             case "Report":
-                JOptionPane.showMessageDialog(currentFrame,
-                        "Report screen is managed by the Report module.",
-                        "NGO Tasks", JOptionPane.INFORMATION_MESSAGE);
-                return;
+                nextFrame = new ngo.ui.report.ReportForm();
+                break;
             default:
                 return;
         }
