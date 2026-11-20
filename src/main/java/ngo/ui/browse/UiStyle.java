@@ -132,6 +132,7 @@ public final class UiStyle {
     private static void navigate(String menuName, JFrame currentFrame) {
         if (("Search tasks".equals(menuName) && currentFrame instanceof SearchForm)
                 || ("Projects".equals(menuName) && currentFrame instanceof MasterDetailForm)
+                || ("Browse".equals(menuName) && currentFrame instanceof ngo.ui.grid.BrowseForm)
                 || ("Edit task".equals(menuName) && currentFrame instanceof EditTaskForm)) {
             return;
         }
@@ -147,11 +148,9 @@ public final class UiStyle {
             case "Edit task":
                 nextFrame = new EditTaskForm();
                 break;
-            case "Browse":
-                JOptionPane.showMessageDialog(currentFrame,
-                        "Browse screen is managed by the Browse module.",
-                        "NGO Tasks", JOptionPane.INFORMATION_MESSAGE);
-                return;
+                        case "Browse":
+                nextFrame = new ngo.ui.grid.BrowseForm();
+                break;
             case "Report":
                 JOptionPane.showMessageDialog(currentFrame,
                         "Report screen is managed by the Report module.",
@@ -226,4 +225,7 @@ public final class UiStyle {
             return this;
         }
     }
+
+  
+    
 }
