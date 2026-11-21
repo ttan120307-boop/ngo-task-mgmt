@@ -44,23 +44,31 @@ public class ReportForm extends JFrame {
         "In progress", "Done", "Overdue"};
     private static final int[] VOLUNTEER_WIDTHS = {40, 260, 130, 110, 100, 100};
 
+    private static final String[] BLOCKED_HEADERS = ReportDAO.BLOCKED_COLUMNS;
+    private static final int[] BLOCKED_WIDTHS = {40, 260, 230, 150, 160};
+    private static final String[] COMPLETED_HEADERS = ReportDAO.COMPLETED_COLUMNS;
+    private static final int[] COMPLETED_WIDTHS = {40, 300, 200, 130};
+    private static final String[] TOP_HEADERS = ReportDAO.TOP_COMMENTER_COLUMNS;
+    private static final int[] TOP_WIDTHS = {40, 300, 160};
+    private static final String[] MODE_NAMES = {"By project", "By volunteer", "Blocked tasks",
+        "Completed projects", "Top commenter"};
+
     private static final Color LINE = new Color(0xD3D1C7);
     private static final Color TEXT = new Color(0x1A1A1A);
     private static final Color MUTED = new Color(0x5F5E5A);
 
     private final ReportDAO reportDAO = new ReportDAO();
 
-    private RoundButton projectBtn;
-    private RoundButton volunteerBtn;
+    private final RoundButton[] modeBtns = new RoundButton[5];
     private RoundButton refreshBtn;
     private final JLabel countLabel = new JLabel(" ");
     private final JTable table = new JTable();
-    private boolean byProject = true;     // which report is shown
+    private int mode = 0;                 // which report is shown (index of MODE_NAMES)
     private int loadSeq = 0;              // ignore answers of older loads
 
     public ReportForm() {
         super("Report");
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         UiStyle.apply(this, "Report");
         add(buildMainPanel(), BorderLayout.CENTER);
 
@@ -91,19 +99,16 @@ public class ReportForm extends JFrame {
         titleRow.add(title, BorderLayout.WEST);
         titleRow.add(buttons, BorderLayout.EAST);
 
-        projectBtn = new RoundButton("By project", 40);
-        volunteerBtn = new RoundButton("By volunteer", 40);
-        projectBtn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        volunteerBtn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        projectBtn.setBorder(BorderFactory.createEmptyBorder(5, 14, 5, 14));
-        volunteerBtn.setBorder(BorderFactory.createEmptyBorder(5, 14, 5, 14));
-        projectBtn.addActionListener(e -> selectReport(true));
-        volunteerBtn.addActionListener(e -> selectReport(false));
-
         JPanel chipRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         chipRow.setBackground(Color.WHITE);
-        chipRow.add(projectBtn);
-        chipRow.add(volunteerBtn);
+        for (int i = 0; i < modeBtns.length; i++) {
+            final int m = i;
+            modeBtns[i] = new RoundButton(MODE_NAMES[i], 40);
+            modeBtns[i].setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            modeBtns[i].setBorder(BorderFactory.createEmptyBorder(5, 14, 5, 14));
+            modeBtns[i].addActionListener(e -> selectReport(m));
+            chipRow.add(modeBtns[i]);
+        }
 
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createLineBorder(LINE));
@@ -140,30 +145,32 @@ public class ReportForm extends JFrame {
         return main;
     }
 
-    private void selectReport(boolean project) {
-        byProject = project;
+    private void selectReport(int m) {
+        mode = m;
         updateButtons();
         loadReport();
     }
 
     private void updateButtons() {
-        if (byProject) {
-            projectBtn.filled();
-            volunteerBtn.outline();
-        } else {
-            projectBtn.outline();
-            volunteerBtn.filled();
+        for (int i = 0; i < modeBtns.length; i++) {
+            if (i == mode) modeBtns[i].filled(); else modeBtns[i].outline();
         }
     }
 
     // ---------- database call (background thread) ----------
     private void loadReport() {
-        final boolean project = byProject;
+        final int m = mode;
         final int mySeq = ++loadSeq;
         new SwingWorker<List<Object[]>, Void>() {
             @Override
             protected List<Object[]> doInBackground() {
-                return project ? reportDAO.reportRows() : reportDAO.volunteerReportRows();
+                switch (m) {
+                    case 0:  return reportDAO.reportRows();
+                    case 1:  return reportDAO.volunteerReportRows();
+                    case 2:  return reportDAO.blockedTaskRows();
+                    case 3:  return reportDAO.completedProjectRows();
+                    default: return reportDAO.topCommenterRows();
+                }
             }
 
             @Override
@@ -173,10 +180,8 @@ public class ReportForm extends JFrame {
                 }
                 try {
                     List<Object[]> rows = get();
-                    showRows(rows, project);
-                    countLabel.setText(rows.size() + (project
-                            ? (rows.size() == 1 ? " project" : " projects")
-                            : (rows.size() == 1 ? " volunteer" : " volunteers")));
+                    showRows(rows, m);
+                    countLabel.setText(rows.size() + (rows.size() == 1 ? " row" : " rows"));
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                 } catch (ExecutionException ee) {
@@ -186,9 +191,11 @@ public class ReportForm extends JFrame {
         }.execute();
     }
 
-    private void showRows(List<Object[]> rows, boolean project) {
-        final String[] headers = project ? PROJECT_HEADERS : VOLUNTEER_HEADERS;
-        final int[] widths = project ? PROJECT_WIDTHS : VOLUNTEER_WIDTHS;
+    private void showRows(List<Object[]> rows, int m) {
+        final String[][] allHeaders = {PROJECT_HEADERS, VOLUNTEER_HEADERS, BLOCKED_HEADERS, COMPLETED_HEADERS, TOP_HEADERS};
+        final int[][] allWidths = {PROJECT_WIDTHS, VOLUNTEER_WIDTHS, BLOCKED_WIDTHS, COMPLETED_WIDTHS, TOP_WIDTHS};
+        final String[] headers = allHeaders[m];
+        final int[] widths = allWidths[m];
         DefaultTableModel model = new DefaultTableModel(headers, 0) {
             @Override
             public boolean isCellEditable(int row, int col) {

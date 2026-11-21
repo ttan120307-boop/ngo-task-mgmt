@@ -56,14 +56,11 @@ public class TaskEditingService {
             }
 
             validateProjectDeadline(connection, task);
-            if (oldTeamId != task.getTeamId()) {
-                int invalidAssignees = countAssigneesNotInTeam(connection, task.getTaskId(), task.getTeamId());
-                if (invalidAssignees > 0) {
-                    throw new IllegalArgumentException(
-                            "Không thể đổi Team vì có " + invalidAssignees
-                            + " người đang được giao Task nhưng không phải thành viên hiện tại của Team mới. "
-                            + "Hãy xử lý Assignment trước khi đổi Team.");
-                }
+            if (oldTeamId != task.getTeamId() && countAssignees(connection, task.getTaskId()) > 0) {
+                // business rule BR24 (trigger trg_task_team_bu): the team of a task with assignments is fixed
+                throw new IllegalArgumentException(
+                        "Cannot change the Team: this task already has assignees (rule BR24). "
+                        + "Remove its assignments first, or create a new task for the other team.");
             }
 
             // SQL triggers enforce dependency/project/status rules at database level.
@@ -83,13 +80,11 @@ public class TaskEditingService {
         if (error != null) throw new IllegalArgumentException(error);
 
         BigDecimal hours = task.getEstimatedHours();
-        if (hours != null) {
-            if (hours.compareTo(MAX_HOURS) > 0) {
-                throw new IllegalArgumentException("Estimated hours không được vượt quá 9999.99.");
-            }
-            if (hours.stripTrailingZeros().scale() > 2) {
-                throw new IllegalArgumentException("Estimated hours chỉ được có tối đa 2 chữ số thập phân.");
-            }
+        if (hours.compareTo(MAX_HOURS) > 0) {
+            throw new IllegalArgumentException("Estimated hours must not exceed 9999.99.");
+        }
+        if (hours.stripTrailingZeros().scale() > 2) {
+            throw new IllegalArgumentException("Estimated hours may have at most 2 decimal places.");
         }
     }
 
@@ -111,7 +106,7 @@ public class TaskEditingService {
                 if (!rs.next()) throw new IllegalArgumentException("Project được chọn không tồn tại.");
                 Date projectDueSql = rs.getDate("due_date");
                 LocalDate projectDue = projectDueSql == null ? null : projectDueSql.toLocalDate();
-                if (task.getDueDate() != null && projectDue != null && task.getDueDate().isAfter(projectDue)) {
+                if (projectDue != null && task.getDueDate().isAfter(projectDue)) {
                     throw new IllegalArgumentException(
                             "Due date của Task không được sau deadline của Project (" + projectDue + ").");
                 }
@@ -119,16 +114,10 @@ public class TaskEditingService {
         }
     }
 
-    private int countAssigneesNotInTeam(java.sql.Connection connection, int taskId, int teamId)
-            throws SQLException {
-        String sql = "SELECT COUNT(*) FROM TASK_ASSIGNMENT a "
-                + "WHERE a.task_id = ? AND NOT EXISTS ("
-                + "SELECT 1 FROM MEMBERSHIP m "
-                + "WHERE m.volunteer_id = a.volunteer_id "
-                + "AND m.team_id = ? AND m.left_date IS NULL)";
+    private int countAssignees(java.sql.Connection connection, int taskId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM TASK_ASSIGNMENT WHERE task_id = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, taskId);
-            ps.setInt(2, teamId);
             try (ResultSet rs = ps.executeQuery()) {
                 rs.next();
                 return rs.getInt(1);

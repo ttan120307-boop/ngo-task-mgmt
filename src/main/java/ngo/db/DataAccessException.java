@@ -19,8 +19,16 @@ public class DataAccessException extends RuntimeException {
     private static final Map<String, String> CHECK_MSG = new LinkedHashMap<>();
 
     static {
-        TRIGGER_MSG.put("Assigned volunteer must be a current member of the task team",
-                "The assigned volunteer must be a current member of the task's team.");
+        TRIGGER_MSG.put("Assigned volunteer must be a member of the task team on the assigned date",
+                "The volunteer must be a member of the task's team on the assigned date.");
+        TRIGGER_MSG.put("The team of a task that already has assignments cannot be changed",
+                "The team of a task that already has assignees cannot be changed.");
+        TRIGGER_MSG.put("Task due date is after the project due date",
+                "The task due date cannot be after the project due date.");
+        TRIGGER_MSG.put("A task of this project is due after the new project due date",
+                "A task of this project is due after the new project due date.");
+        TRIGGER_MSG.put("Role id 1 is reserved for the role Leader, and Leader must have id 1",
+                "Role id 1 is reserved for the role Leader.");
         TRIGGER_MSG.put("A task cannot start until all its prerequisite tasks are completed",
                 "Cannot change status to IN_PROGRESS/DONE while prerequisite tasks are still unfinished.");
         TRIGGER_MSG.put("A task cannot be re-opened while a dependent task has already started",
@@ -40,8 +48,6 @@ public class DataAccessException extends RuntimeException {
                 "Joined date cannot be earlier than the volunteer's registration date.");
         TRIGGER_MSG.put("Joined date is before the team was created",
                 "Joined date cannot be earlier than the team's creation date.");
-        TRIGGER_MSG.put("This team already has a current Leader",
-                "This team already has a current Leader.");
 
         CHECK_MSG.put("ck_membership_dates", "Left date must be on or after the joined date.");
         CHECK_MSG.put("ck_project_name", "Project name cannot be empty.");
@@ -76,6 +82,8 @@ public class DataAccessException extends RuntimeException {
             case 1062:
                 if (raw.contains("uq_membership_one_current"))
                     msg = "This volunteer is already an active member of the team.";
+                else if (raw.contains("uq_membership_one_leader"))
+                    msg = "This team already has a current Leader.";
                 else if (raw.contains("uq_membership_same_day"))
                     msg = "A membership record for this team on the same date already exists.";
                 else

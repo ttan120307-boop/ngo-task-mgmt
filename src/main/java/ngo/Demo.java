@@ -14,6 +14,7 @@ import java.util.List;
 /** Test run for CRUD + transactions + user-friendly error messages. Requires 01, 03, and 05 .sql scripts to be loaded first. */
 public class Demo {
     public static void main(String[] args) {
+        ngo.auth.AuthService.login("minhanh.nguyen", "Ngo@2026");   // log in as Admin (demo account, see sql/09)
         TaskDAO dao = new TaskDAO();
         TaskService svc = new TaskService();
 

@@ -16,8 +16,8 @@ public class Task {
     private String description;          // nullable
     private String priority = "MEDIUM";
     private String status = "TODO";
-    private BigDecimal estimatedHours;   // nullable
-    private LocalDate dueDate;           // nullable
+    private BigDecimal estimatedHours;   // NOT NULL (business rule BR6)
+    private LocalDate dueDate;           // NOT NULL (business rule BR6)
 
     public int getTaskId() { return taskId; }
     public void setTaskId(int taskId) { this.taskId = taskId; }
@@ -46,7 +46,9 @@ public class Task {
         if (teamId <= 0) return "Please select an assigned Team.";
         if (!PRIORITIES.contains(priority)) return "Priority must be LOW, MEDIUM, HIGH, or URGENT.";
         if (!STATUSES.contains(status)) return "Status must be TODO, IN_PROGRESS, DONE, or CANCELLED.";
-        if (estimatedHours != null && estimatedHours.signum() <= 0) return "Estimated hours must be greater than 0.";
+        if (estimatedHours == null) return "Estimated hours is required.";
+        if (estimatedHours.signum() <= 0) return "Estimated hours must be greater than 0.";
+        if (dueDate == null) return "Due date is required (format yyyy-MM-dd).";
         return null;
     }
 

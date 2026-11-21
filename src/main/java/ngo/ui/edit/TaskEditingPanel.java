@@ -292,7 +292,8 @@ public class TaskEditingPanel extends JPanel {
         if (team == null) throw new IllegalArgumentException("Vui lòng chọn Team phụ trách.");
 
         BigDecimal hours = null;
-        if (!hoursField.getText().trim().isEmpty()) {
+        if (hoursField.getText().trim().isEmpty()) throw new IllegalArgumentException("Estimated hours là bắt buộc.");
+        {
             try {
                 hours = new BigDecimal(hoursField.getText().trim());
             } catch (NumberFormatException e) {
@@ -301,7 +302,8 @@ public class TaskEditingPanel extends JPanel {
         }
 
         LocalDate dueDate = null;
-        if (!dueDateField.getText().trim().isEmpty()) {
+        if (dueDateField.getText().trim().isEmpty()) throw new IllegalArgumentException("Due date là bắt buộc (yyyy-MM-dd).");
+        {
             try {
                 dueDate = LocalDate.parse(dueDateField.getText().trim());
             } catch (DateTimeParseException e) {

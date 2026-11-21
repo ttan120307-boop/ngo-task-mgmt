@@ -1,5 +1,7 @@
 package ngo.dao;
 
+import ngo.auth.Authz;
+
 import ngo.db.DBConnection;
 import ngo.db.DataAccessException;
 import ngo.model.Task;
@@ -29,6 +31,7 @@ public class TaskDAO {
 
     // ---------------- CREATE ----------------
     public int insert(Connection c, Task t) throws SQLException {
+        Authz.requireTaskEditor(t.getProjectId(), t.getTeamId());
         String sql = "INSERT INTO TASK (project_id, team_id, title, description, priority, status, "
                    + "estimated_hours, due_date) VALUES (?,?,?,?,?,?,?,?)";
         try (PreparedStatement ps = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -174,7 +177,7 @@ public class TaskDAO {
             params.add(priority);
         }
         sql.append(" GROUP BY t.task_id, t.title, tm.team_name, t.priority, t.status, t.due_date")
-           .append(" ORDER BY t.task_id");
+           .append(" ORDER BY t.due_date, t.task_id");   // earliest due date first (Topic 6 query 1)
 
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement(sql.toString())) {
@@ -205,6 +208,8 @@ public class TaskDAO {
 
     // ---------------- UPDATE ----------------
     public int update(Connection c, Task t) throws SQLException {
+        Authz.requireTaskEditorOfTask(t.getTaskId());                 // current project/team
+        Authz.requireTaskEditor(t.getProjectId(), t.getTeamId());     // new project/team
         String sql = "UPDATE TASK SET project_id=?, team_id=?, title=?, description=?, priority=?, "
                    + "status=?, estimated_hours=?, due_date=? WHERE task_id=?";
         try (PreparedStatement ps = c.prepareStatement(sql)) {
@@ -225,6 +230,7 @@ public class TaskDAO {
     // ---------------- DELETE ----------------
     /** Deleting a TASK will CASCADE to TASK_ASSIGNMENT, TASK_COMMENT, ATTACHMENT, and TASK_DEPENDENCY. */
     public int delete(Connection c, int taskId) throws SQLException {
+        Authz.requireTaskEditorOfTask(taskId);
         try (PreparedStatement ps = c.prepareStatement("DELETE FROM TASK WHERE task_id = ?")) {
             ps.setInt(1, taskId);
             return ps.executeUpdate();

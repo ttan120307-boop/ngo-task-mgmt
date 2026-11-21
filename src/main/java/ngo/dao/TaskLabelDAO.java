@@ -1,5 +1,7 @@
 package ngo.dao;
 
+import ngo.auth.Authz;
+
 import ngo.dao.LookupDAO.ComboItem;
 import ngo.db.DBConnection;
 import ngo.db.DataAccessException;
@@ -39,6 +41,7 @@ public class TaskLabelDAO {
 
     /** Assigns a label to a task. Throws a user-friendly error on duplicate assignment. */
     public void add(int taskId, int labelId) {
+        Authz.requireTaskEditorOfTask(taskId);
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("INSERT INTO TASK_LABEL (task_id, label_id) VALUES (?, ?)")) {
             ps.setInt(1, taskId);
@@ -53,6 +56,7 @@ public class TaskLabelDAO {
 
     /** Removes a label from a task. Returns the number of deleted rows (0 if the task does not have that label). */
     public int remove(int taskId, int labelId) {
+        Authz.requireTaskEditorOfTask(taskId);
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("DELETE FROM TASK_LABEL WHERE task_id = ? AND label_id = ?")) {
             ps.setInt(1, taskId);
@@ -69,6 +73,7 @@ public class TaskLabelDAO {
      * Convenient when the Task form has a multi-select checkbox list of labels and the user clicks Save.
      */
     public void replaceLabels(int taskId, List<Integer> labelIds) {
+        Authz.requireTaskEditorOfTask(taskId);
         Tx.run(c -> {
             try (PreparedStatement del = c.prepareStatement("DELETE FROM TASK_LABEL WHERE task_id = ?")) {
                 del.setInt(1, taskId);

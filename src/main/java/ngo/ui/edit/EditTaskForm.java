@@ -470,7 +470,8 @@ public class EditTaskForm extends JFrame {
 
         BigDecimal estimatedHours = null;
         String hoursText = hoursField.getText().trim();
-        if (!hoursText.isEmpty()) {
+        if (hoursText.isEmpty()) throw new IllegalArgumentException("Estimated hours is required.");
+        {
             try {
                 estimatedHours = new BigDecimal(hoursText);
             } catch (NumberFormatException ex) {
@@ -480,7 +481,8 @@ public class EditTaskForm extends JFrame {
 
         LocalDate dueDate = null;
         String dateText = dueDateField.getText().trim();
-        if (!dateText.isEmpty()) {
+        if (dateText.isEmpty()) throw new IllegalArgumentException("Due date is required (yyyy-MM-dd).");
+        {
             try {
                 dueDate = LocalDate.parse(dateText);
             } catch (DateTimeParseException ex) {

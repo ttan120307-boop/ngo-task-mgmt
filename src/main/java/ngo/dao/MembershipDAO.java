@@ -1,5 +1,7 @@
 package ngo.dao;
 
+import ngo.auth.Authz;
+
 import ngo.db.DBConnection;
 import ngo.db.DataAccessException;
 
@@ -23,6 +25,7 @@ public class MembershipDAO {
 
     /** Join a team. If joinedDate is null, defaults to today. Returns the new membership_id. */
     public int join(int volunteerId, int teamId, int teamRoleId, LocalDate joinedDate) {
+        Authz.requireTeamManager(teamId);
         LocalDate d = joinedDate == null ? LocalDate.now() : joinedDate;
         String sql = "INSERT INTO MEMBERSHIP (volunteer_id, team_id, team_role_id, joined_date) VALUES (?,?,?,?)";
         try (Connection c = DBConnection.getConnection();
@@ -43,6 +46,7 @@ public class MembershipDAO {
 
     /** Leave a team: sets left_date. If leftDate is null, defaults to today. */
     public void leave(int membershipId, LocalDate leftDate) {
+        Authz.requireTeamManagerOfMembership(membershipId);
         LocalDate d = leftDate == null ? LocalDate.now() : leftDate;
         String sql = "UPDATE MEMBERSHIP SET left_date = ? WHERE membership_id = ? AND left_date IS NULL";
         try (Connection c = DBConnection.getConnection();

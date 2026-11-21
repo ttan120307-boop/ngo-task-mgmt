@@ -93,4 +93,67 @@ public class ReportDAO {
             throw DataAccessException.from(e);
         }
     }
+
+    // ---------------- Report 3: blocked tasks ----------------
+    public static final String[] BLOCKED_COLUMNS =
+            {"ID", "Task", "Project", "Unfinished prerequisites", "Waiting for task IDs"};
+
+    /** TODO tasks that cannot start because at least one prerequisite is not DONE (Topic 6 query 3). */
+    public List<Object[]> blockedTaskRows() {
+        String sql = "SELECT t.task_id, t.title, p.project_name, COUNT(*) AS unfinished, " +
+                     "GROUP_CONCAT(pre.task_id ORDER BY pre.task_id SEPARATOR ', ') AS waiting_for " +
+                     "FROM TASK t " +
+                     "JOIN PROJECT p ON p.project_id = t.project_id " +
+                     "JOIN TASK_DEPENDENCY d ON d.dependent_task_id = t.task_id " +
+                     "JOIN TASK pre ON pre.task_id = d.prerequisite_task_id " +
+                     "WHERE t.status = 'TODO' AND pre.status <> 'DONE' " +
+                     "GROUP BY t.task_id, t.title, p.project_name " +
+                     "ORDER BY t.project_id, t.task_id";
+        return run(sql, rs -> new Object[]{rs.getInt(1), rs.getString(2), rs.getString(3), rs.getInt(4), rs.getString(5)});
+    }
+
+    // ---------------- Report 4: completed projects ----------------
+    public static final String[] COMPLETED_COLUMNS = {"ID", "Project", "Owner", "Tasks (all DONE)"};
+
+    /** Projects that have at least one task and where every task is DONE (NOT EXISTS, Topic 6 query 4). */
+    public List<Object[]> completedProjectRows() {
+        String sql = "SELECT p.project_id, p.project_name, v.full_name, " +
+                     "(SELECT COUNT(*) FROM TASK t2 WHERE t2.project_id = p.project_id) AS n " +
+                     "FROM PROJECT p JOIN VOLUNTEER v ON v.volunteer_id = p.owner_id " +
+                     "WHERE EXISTS (SELECT 1 FROM TASK t WHERE t.project_id = p.project_id) " +
+                     "AND NOT EXISTS (SELECT 1 FROM TASK t WHERE t.project_id = p.project_id AND t.status <> 'DONE') " +
+                     "ORDER BY p.project_id";
+        return run(sql, rs -> new Object[]{rs.getInt(1), rs.getString(2), rs.getString(3), rs.getInt(4)});
+    }
+
+    // ---------------- Report 5: volunteer who commented in most projects ----------------
+    public static final String[] TOP_COMMENTER_COLUMNS = {"ID", "Volunteer", "Projects commented"};
+
+    /** The volunteer(s) who commented on tasks of the largest number of different projects (Topic 6 query 5). */
+    public List<Object[]> topCommenterRows() {
+        String sql = "SELECT c.volunteer_id, v.full_name, COUNT(DISTINCT t.project_id) AS n " +
+                     "FROM TASK_COMMENT c JOIN TASK t ON t.task_id = c.task_id " +
+                     "JOIN VOLUNTEER v ON v.volunteer_id = c.volunteer_id " +
+                     "GROUP BY c.volunteer_id, v.full_name " +
+                     "HAVING COUNT(DISTINCT t.project_id) = (SELECT MAX(x.n) FROM (" +
+                     "  SELECT COUNT(DISTINCT t2.project_id) AS n FROM TASK_COMMENT c2 " +
+                     "  JOIN TASK t2 ON t2.task_id = c2.task_id GROUP BY c2.volunteer_id) x) " +
+                     "ORDER BY c.volunteer_id";
+        return run(sql, rs -> new Object[]{rs.getInt(1), rs.getString(2), rs.getInt(3)});
+    }
+
+    @FunctionalInterface
+    private interface RowMapper { Object[] map(ResultSet rs) throws SQLException; }
+
+    private List<Object[]> run(String sql, RowMapper mapper) {
+        try (Connection c = DBConnection.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            List<Object[]> rows = new ArrayList<>();
+            while (rs.next()) rows.add(mapper.map(rs));
+            return rows;
+        } catch (SQLException e) {
+            throw DataAccessException.from(e);
+        }
+    }
 }

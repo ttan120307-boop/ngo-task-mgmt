@@ -1,5 +1,7 @@
 package ngo.dao;
 
+import ngo.auth.Authz;
+
 import ngo.dao.LookupDAO.ComboItem;
 import ngo.db.DBConnection;
 import ngo.db.DataAccessException;
@@ -54,6 +56,7 @@ public class TaskDependencyDAO {
 
     /** dependentTaskId requires prerequisiteTaskId to be completed first. */
     public void add(int dependentTaskId, int prerequisiteTaskId) {
+        Authz.requireTaskEditorOfTask(dependentTaskId);
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("INSERT INTO TASK_DEPENDENCY (dependent_task_id, prerequisite_task_id) VALUES (?, ?)")) {
             ps.setInt(1, dependentTaskId);
@@ -66,6 +69,7 @@ public class TaskDependencyDAO {
 
     /** Returns the number of deleted rows (0 if the dependency does not exist). */
     public int remove(int dependentTaskId, int prerequisiteTaskId) {
+        Authz.requireTaskEditorOfTask(dependentTaskId);
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("DELETE FROM TASK_DEPENDENCY WHERE dependent_task_id = ? AND prerequisite_task_id = ?")) {
             ps.setInt(1, dependentTaskId);

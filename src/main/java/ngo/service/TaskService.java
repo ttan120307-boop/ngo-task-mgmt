@@ -1,5 +1,7 @@
 package ngo.service;
 
+import ngo.auth.Authz;
+
 import ngo.dao.TaskDAO;
 import ngo.db.Tx;
 import ngo.model.Task;
@@ -49,6 +51,7 @@ public class TaskService {
      * so concurrent comments do not cause duplicate key conflicts.
      */
     public int addComment(int taskId, int authorId, String content, List<AttachmentInfo> files) {
+        Authz.requireSelfOrAdmin(authorId);
         if (content == null || content.isBlank())
             throw new IllegalArgumentException("Comment content cannot be empty.");
 
@@ -103,6 +106,7 @@ public class TaskService {
      * restoring the previous assignment (a great example to demonstrate ROLLBACK).
      */
     public void transferAssignment(int taskId, int fromVolunteerId, int toVolunteerId) {
+        Authz.requireTaskEditorOfTask(taskId);
         Tx.run(c -> {
             try (PreparedStatement del = c.prepareStatement("DELETE FROM TASK_ASSIGNMENT WHERE task_id = ? AND volunteer_id = ?")) {
                 del.setInt(1, taskId);

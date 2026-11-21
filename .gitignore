@@ -1,2 +1,7 @@
 config/db.properties
 target/
+cls/
+out/
+*.class
+.idea/
+*.iml

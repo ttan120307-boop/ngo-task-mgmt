@@ -1,5 +1,7 @@
 package ngo.dao;
 
+import ngo.auth.Authz;
+
 import ngo.db.DBConnection;
 import ngo.db.DataAccessException;
 import ngo.model.Project;
@@ -49,6 +51,7 @@ public class ProjectDAO {
     // ---------------- CREATE ----------------
     /** Returns the newly generated project_id. */
     public int insert(Project p) {
+        Authz.requireCanCreateProject(p.getOwnerId());
         String sql = "INSERT INTO PROJECT (owner_id, project_name, description, start_date, due_date) " +
                      "VALUES (?,?,?,?,?)";
         try (Connection c = DBConnection.getConnection();
@@ -91,6 +94,7 @@ public class ProjectDAO {
 
     // ---------------- UPDATE ----------------
     public int update(Project p) {
+        Authz.requireProjectManager(p.getProjectId(), p.getOwnerId());
         String sql = "UPDATE PROJECT SET owner_id=?, project_name=?, description=?, start_date=?, due_date=? " +
                      "WHERE project_id=?";
         try (Connection c = DBConnection.getConnection();
@@ -106,6 +110,9 @@ public class ProjectDAO {
     // ---------------- DELETE ----------------
     /** CAUTION: deleting a project will CASCADE delete all of its tasks (along with assignments, comments, attachments, and dependencies). */
     public int delete(int projectId) {
+        Project old = findById(projectId);
+        if (old != null) Authz.requireProjectManager(projectId, old.getOwnerId());
+        else Authz.requireStaff();
         try (Connection c = DBConnection.getConnection();
              PreparedStatement ps = c.prepareStatement("DELETE FROM PROJECT WHERE project_id = ?")) {
             ps.setInt(1, projectId);

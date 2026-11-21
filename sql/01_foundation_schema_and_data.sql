@@ -5,7 +5,7 @@
 -- DBMS: MySQL 8.0.16 or later (tested requirements: CHECK enforced, InnoDB).
 -- MySQL-specific features used in this file (not standard SQL):
 --   * DEFAULT (CURRENT_DATE)  expression default          (needs 8.0.13+)
---   * GENERATED ALWAYS ... STORED column (is_current)
+--   * GENERATED ALWAYS ... STORED columns (is_current, leader_flag)
 --   * REGEXP in CHECK constraints
 --   * triggers with SIGNAL SQLSTATE '45000'  (MySQL error 1644)
 --   * DELIMITER (client command, used by mysql CLI and MySQL Workbench)
@@ -38,7 +38,7 @@ CREATE TABLE VOLUNTEER (
 ) ENGINE = InnoDB;
 
 -- Multivalued attribute: one volunteer, several phone numbers.
--- A phone number belongs to exactly ONE volunteer (business rule 17), so
+-- A phone number belongs to exactly ONE volunteer (BR16), so
 -- phone_number alone is the primary key (FD: phone_number -> volunteer_id).
 CREATE TABLE VOLUNTEER_PHONE (
     phone_number  VARCHAR(11)  NOT NULL,
@@ -64,7 +64,11 @@ CREATE TABLE TEAM (
 ) ENGINE = InnoDB;
 
 -- Lookup table for the role a volunteer plays inside a team (BR2).
--- The role named 'Leader' has a special meaning in trigger trg_membership_bi/bu.
+-- CONVENTION: the role with team_role_id = 1 is the role 'Leader'. The rule "one current
+-- Leader per team" (BR17) is a declared UNIQUE key on MEMBERSHIP that tests team_role_id = 1,
+-- so the id of the Leader role must never change; the two triggers below enforce
+-- this: id 1 can only belong to 'Leader', and 'Leader' can only have id 1.
+-- (Insert the Leader role with an explicit id: INSERT ... VALUES (1, 'Leader').)
 CREATE TABLE TEAM_ROLE (
     team_role_id  INT UNSIGNED  NOT NULL AUTO_INCREMENT,
     role_name     VARCHAR(50)   NOT NULL,
@@ -72,11 +76,38 @@ CREATE TABLE TEAM_ROLE (
     CONSTRAINT uq_team_role_name  UNIQUE (role_name)
 ) ENGINE = InnoDB;
 
+DELIMITER //
+CREATE TRIGGER trg_team_role_bi
+BEFORE INSERT ON TEAM_ROLE
+FOR EACH ROW
+BEGIN
+    IF (NEW.team_role_id = 1) <> (NEW.role_name = 'Leader') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Role id 1 is reserved for the role Leader, and Leader must have id 1';
+    END IF;
+END//
+
+CREATE TRIGGER trg_team_role_bu
+BEFORE UPDATE ON TEAM_ROLE
+FOR EACH ROW
+BEGIN
+    IF (NEW.team_role_id = 1) <> (NEW.role_name = 'Leader') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Role id 1 is reserved for the role Leader, and Leader must have id 1';
+    END IF;
+END//
+DELIMITER ;
+
 -- ---------------------------------------------------------------------
 -- 3. MEMBERSHIP  (the junction table "team_members")
 --    BR1: many teams per volunteer, but only ONE current membership per
 --    (volunteer, team). is_current is 1 while left_date IS NULL, otherwise
 --    NULL. UNIQUE ignores NULLs, so ended memberships never collide.
+--    BR17: only ONE current Leader per team, by the same technique: leader_flag
+--    is 1 only for a current membership with team_role_id = 1 (Leader), otherwise
+--    NULL, and UNIQUE (team_id, leader_flag) allows one such row per team.
+--    MySQL does not allow ON UPDATE/ON DELETE CASCADE on a foreign key column that
+--    a stored generated column is built from, so fk_membership_role uses RESTRICT.
 -- ---------------------------------------------------------------------
 CREATE TABLE MEMBERSHIP (
     membership_id  INT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -86,16 +117,19 @@ CREATE TABLE MEMBERSHIP (
     joined_date    DATE          NOT NULL DEFAULT (CURRENT_DATE),
     left_date      DATE          NULL,
     is_current     TINYINT GENERATED ALWAYS AS (CASE WHEN left_date IS NULL THEN 1 ELSE NULL END) STORED,
+    leader_flag    TINYINT GENERATED ALWAYS AS
+                   (CASE WHEN left_date IS NULL AND team_role_id = 1 THEN 1 ELSE NULL END) STORED,
     CONSTRAINT pk_membership PRIMARY KEY (membership_id),
     CONSTRAINT uq_membership_one_current UNIQUE (volunteer_id, team_id, is_current),
     CONSTRAINT uq_membership_same_day    UNIQUE (volunteer_id, team_id, joined_date),
+    CONSTRAINT uq_membership_one_leader  UNIQUE (team_id, leader_flag),
     CONSTRAINT ck_membership_dates CHECK (left_date IS NULL OR left_date >= joined_date),
     CONSTRAINT fk_membership_volunteer FOREIGN KEY (volunteer_id)
         REFERENCES VOLUNTEER (volunteer_id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_membership_team FOREIGN KEY (team_id)
         REFERENCES TEAM (team_id)           ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_membership_role FOREIGN KEY (team_role_id)
-        REFERENCES TEAM_ROLE (team_role_id) ON DELETE RESTRICT ON UPDATE CASCADE
+        REFERENCES TEAM_ROLE (team_role_id) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE = InnoDB;
 
 -- Index for: "current members of a team" and "teams with at least 3 current
@@ -104,9 +138,10 @@ CREATE INDEX idx_membership_team_current ON MEMBERSHIP (team_id, left_date, volu
 
 -- ---------------------------------------------------------------------
 -- Cross-table rules that CHECK cannot express (triggers):
---   R-A  a team has at most ONE current Leader
---   R-B  joined_date >= volunteer.registered_date
---   R-C  joined_date >= team.created_date
+--   BR18  joined_date >= volunteer.registered_date
+--         joined_date >= team.created_date
+-- (The rule "one current Leader per team", BR17, is no longer a trigger: it is the
+--  declared key uq_membership_one_leader above.)
 -- Scalar sub-selects are used so that an unknown volunteer/team gives NULL
 -- (the foreign key then reports error 1452 as usual).
 -- Limitation: the dates of VOLUNTEER/TEAM are not re-checked if they are
@@ -120,7 +155,6 @@ FOR EACH ROW
 BEGIN
     DECLARE v_registered   DATE;
     DECLARE v_team_created DATE;
-    DECLARE v_is_leader    INT DEFAULT 0;
 
     SET v_registered   = (SELECT registered_date FROM VOLUNTEER WHERE volunteer_id = NEW.volunteer_id);
     SET v_team_created = (SELECT created_date    FROM TEAM      WHERE team_id      = NEW.team_id);
@@ -132,15 +166,6 @@ BEGIN
     IF NEW.joined_date < v_team_created THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Joined date is before the team was created';
-    END IF;
-
-    SET v_is_leader = (SELECT COUNT(*) FROM TEAM_ROLE
-                        WHERE team_role_id = NEW.team_role_id AND role_name = 'Leader');
-    IF v_is_leader = 1 AND NEW.left_date IS NULL AND EXISTS (
-           SELECT 1 FROM MEMBERSHIP
-            WHERE team_id = NEW.team_id AND team_role_id = NEW.team_role_id AND left_date IS NULL) THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'This team already has a current Leader';
     END IF;
 END//
 
@@ -150,7 +175,6 @@ FOR EACH ROW
 BEGIN
     DECLARE v_registered   DATE;
     DECLARE v_team_created DATE;
-    DECLARE v_is_leader    INT DEFAULT 0;
 
     SET v_registered   = (SELECT registered_date FROM VOLUNTEER WHERE volunteer_id = NEW.volunteer_id);
     SET v_team_created = (SELECT created_date    FROM TEAM      WHERE team_id      = NEW.team_id);
@@ -163,22 +187,14 @@ BEGIN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Joined date is before the team was created';
     END IF;
-
-    SET v_is_leader = (SELECT COUNT(*) FROM TEAM_ROLE
-                        WHERE team_role_id = NEW.team_role_id AND role_name = 'Leader');
-    IF v_is_leader = 1 AND NEW.left_date IS NULL AND EXISTS (
-           SELECT 1 FROM MEMBERSHIP
-            WHERE team_id = NEW.team_id AND team_role_id = NEW.team_role_id AND left_date IS NULL
-              AND membership_id <> NEW.membership_id) THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'This team already has a current Leader';
-    END IF;
 END//
 
 DELIMITER ;
 
 -- =====================================================================
 -- Sample data. Fictional people. 16 / 21 / 15 / 15 / 68 rows.
+-- The dates of people and teams are fixed past dates (their history); the dates of projects,
+-- tasks and comments in modules 03, 05 are relative to CURRENT_DATE.
 -- =====================================================================
 
 INSERT INTO VOLUNTEER (volunteer_id, full_name, email, registered_date, system_role) VALUES
