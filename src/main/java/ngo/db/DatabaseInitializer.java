@@ -18,49 +18,57 @@ public final class DatabaseInitializer {
         try (Connection c = DBConnection.getConnection();
              Statement st = c.createStatement()) {
 
-            // Kiểm tra nếu bảng ACCOUNT đã tồn tại và có dữ liệu thì bỏ qua
+            boolean hasTasks = false;
+            boolean hasAccounts = false;
+
             try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM TASK")) {
-                if (rs.next() && rs.getInt(1) > 0) {
-                    return;
+                if (rs.next() && rs.getInt(1) > 0) hasTasks = true;
+            } catch (Exception ignored) {}
+
+            try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM ACCOUNT")) {
+                if (rs.next() && rs.getInt(1) > 0) hasAccounts = true;
+            } catch (Exception ignored) {}
+
+            if (hasTasks && hasAccounts) {
+                return;
+            }
+
+            // 1. Load core schema & seed data scripts (01, 03, 05, 07) if TASK data is missing
+            if (!hasTasks) {
+                List<String> sqlFiles = List.of(
+                    "sql/01_foundation_schema_and_data.sql",
+                    "sql/03_project_task_schema_and_data.sql",
+                    "sql/05_interactions_schema_and_data.sql",
+                    "sql/07_label_schema_and_data.sql"
+                );
+                for (String file : sqlFiles) {
+                    runSqlFile(st, Path.of(file));
                 }
-            } catch (Exception ignored) {
-                // Bảng chưa tồn tại -> tiến hành khởi tạo toàn bộ
             }
 
-            // 1. Nạp các file schema & data cốt lõi (01, 03, 05, 07)
-            List<String> sqlFiles = List.of(
-                "sql/01_foundation_schema_and_data.sql",
-                "sql/03_project_task_schema_and_data.sql",
-                "sql/05_interactions_schema_and_data.sql",
-                "sql/07_label_schema_and_data.sql"
-            );
+            // 2. Create ACCOUNT table and seed 16 demo accounts if ACCOUNT table is empty
+            if (!hasAccounts) {
+                List<String> lines09 = Files.readAllLines(Path.of("sql/09_account_schema_and_data.sql"), StandardCharsets.UTF_8);
+                String ddl09 = String.join("\n", lines09.subList(0, Math.min(47, lines09.size())));
+                executeSqlBlock(st, ddl09);
 
-            for (String file : sqlFiles) {
-                runSqlFile(st, Path.of(file));
-            }
+                try (ResultSet rs = st.executeQuery("SELECT volunteer_id, email FROM VOLUNTEER ORDER BY volunteer_id");
+                     Statement insertSt = c.createStatement()) {
+                    while (rs.next()) {
+                        int vid = rs.getInt("volunteer_id");
+                        String email = rs.getString("email");
+                        String username = email.split("@")[0];
+                        String salt = hashHex("MD5", "ngo-demo-salt-" + vid);
+                        String passHash = hashHex("SHA-256", salt + "Ngo@2026");
+                        int isActive = (vid == 16) ? 0 : 1;
 
-            // 2. Tạo bảng ACCOUNT (lấy 47 dòng đầu của file 09)
-            List<String> lines09 = Files.readAllLines(Path.of("sql/09_account_schema_and_data.sql"), StandardCharsets.UTF_8);
-            String ddl09 = String.join("\n", lines09.subList(0, Math.min(47, lines09.size())));
-            executeSqlBlock(st, ddl09);
-
-            // 3. Sinh 16 tài khoản từ bảng VOLUNTEER trực tiếp bằng Java (tránh lỗi hàm MD5 của MySQL)
-            try (ResultSet rs = st.executeQuery("SELECT volunteer_id, email FROM VOLUNTEER ORDER BY volunteer_id");
-                 Statement insertSt = c.createStatement()) {
-                while (rs.next()) {
-                    int vid = rs.getInt("volunteer_id");
-                    String email = rs.getString("email");
-                    String username = email.split("@")[0];
-                    String salt = hashHex("MD5", "ngo-demo-salt-" + vid);
-                    String passHash = hashHex("SHA-256", salt + "Ngo@2026");
-                    int isActive = (vid == 16) ? 0 : 1;
-
-                    String insertSql = String.format(
-                        "INSERT IGNORE INTO ACCOUNT (volunteer_id, username, salt, password_hash, is_active) " +
-                        "VALUES (%d, '%s', '%s', '%s', %d)",
-                        vid, username, salt, passHash, isActive
-                    );
-                    insertSt.executeUpdate(insertSql);
+                        String insertSql = String.format(
+                            "INSERT IGNORE INTO ACCOUNT (volunteer_id, username, salt, password_hash, is_active) " +
+                            "VALUES (%d, '%s', '%s', '%s', %d)",
+                            vid, username, salt, passHash, isActive
+                        );
+                        insertSt.executeUpdate(insertSql);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -75,7 +83,7 @@ public final class DatabaseInitializer {
     }
 
     private static void executeSqlBlock(Statement st, String sqlContent) throws Exception {
-        // Loại bỏ comment dòng -- và tách lệnh theo dấu ;
+        // Strip single-line SQL comments (--) and split statements by semicolon
         String cleaned = sqlContent.replaceAll("(?m)^\\s*--.*$", "");
         for (String stmt : cleaned.split(";")) {
             String trimmed = stmt.trim();
